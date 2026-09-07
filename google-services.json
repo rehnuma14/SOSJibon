@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "566453717423",
+    "project_id": "sosjibon-5568e",
+    "storage_bucket": "sosjibon-5568e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:566453717423:android:70648df8bb3aade174c75a",
+        "android_client_info": {
+          "package_name": "com.example.sosjibon"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAuIDNNqlLxgunY_GNpHGoZWNPOX6AHEtI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
