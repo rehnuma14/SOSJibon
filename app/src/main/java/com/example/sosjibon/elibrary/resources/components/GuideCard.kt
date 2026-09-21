@@ -30,6 +30,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.sosjibon.elibrary.resources.data.EmergencyCondition
@@ -97,14 +98,18 @@ fun GuideCard(
                 fontSize = 14.5.sp,
                 fontWeight = FontWeight.Bold,
                 color = textDark,
-                maxLines = 2
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                lineHeight = 19.sp
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = condition.whatHappened,
                 fontSize = 11.5.sp,
                 color = textGray,
-                maxLines = 2
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                lineHeight = 16.sp
             )
         }
     }

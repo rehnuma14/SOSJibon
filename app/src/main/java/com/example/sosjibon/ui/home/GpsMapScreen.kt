@@ -34,12 +34,14 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import com.example.sosjibon.elibrary.location.EmergencyLocationHelper
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -70,7 +72,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Locale
 
-private const val GEOAPIFY_API_KEY = ""
+private const val GEOAPIFY_API_KEY = "f29d6b57297b4e16aaafc6668a7e7ae8"
 private const val GEOAPIFY_STYLE_URL = "https://maps.geoapify.com/v1/styles/osm-carto/style.json?apiKey=$GEOAPIFY_API_KEY"
 private val DEFAULT_LOCATION = LatLng(22.3394, 91.8319)
 private const val ROUTE_SOURCE_ID = "nearest-medical-route-source"
@@ -99,6 +101,8 @@ fun GpsMapScreen(onBack: () -> Unit) {
     var savedNearestType by rememberSaveable { mutableStateOf<String?>(null) }
     var savedNearestDistance by rememberSaveable { mutableStateOf<Double?>(null) }
     var userLocation by remember { mutableStateOf(savedUserLocation) }
+
+    val activeSosAlerts by EmergencyLocationHelper.getActiveSosAlerts().collectAsState()
 
     remember {
         MapLibre.getInstance(context.applicationContext)
@@ -239,6 +243,20 @@ fun GpsMapScreen(onBack: () -> Unit) {
                 .title("You are here")
                 .icon(icon)
         )
+    }
+
+    LaunchedEffect(activeSosAlerts, mapLibreMap) {
+        val map = mapLibreMap ?: return@LaunchedEffect
+        activeSosAlerts.forEach { alert ->
+            if (alert.isActive && alert.latitude != 0.0) {
+                map.addMarker(
+                    MarkerOptions()
+                        .position(LatLng(alert.latitude, alert.longitude))
+                        .title("🚨 SOS DANGER: ${alert.userName}")
+                        .snippet("${alert.locationName} • HELP NEEDED!")
+                )
+            }
+        }
     }
 
     LaunchedEffect(mapLibreMap) {

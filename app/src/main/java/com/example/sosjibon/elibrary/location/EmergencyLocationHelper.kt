@@ -10,13 +10,101 @@ import android.location.Location
 import android.net.Uri
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.LocationServices
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import java.util.Locale
 import kotlin.coroutines.resume
 
+data class ActiveSosAlert(
+    val id: String = "",
+    val userName: String = "SOS Member",
+    val userPhone: String = "",
+    val locationName: String = "",
+    val latitude: Double = 0.0,
+    val longitude: Double = 0.0,
+    val accuracy: String = "±3m",
+    val timestamp: Long = System.currentTimeMillis(),
+    val isActive: Boolean = true,
+    val status: String = "LIVE"
+)
+
 object EmergencyLocationHelper {
+
+    private val activeSosAlertsFlow = MutableStateFlow<List<ActiveSosAlert>>(emptyList())
+
+    fun getActiveSosAlerts(): StateFlow<List<ActiveSosAlert>> = activeSosAlertsFlow.asStateFlow()
+
+    fun updateSosBroadcast(
+        id: String = "active_user_sos",
+        userName: String = "SOS Member",
+        userPhone: String = "",
+        locationName: String,
+        latitude: Double,
+        longitude: Double,
+        accuracy: String = "±3m"
+    ) {
+        val alert = ActiveSosAlert(
+            id = id,
+            userName = userName,
+            userPhone = userPhone,
+            locationName = locationName,
+            latitude = latitude,
+            longitude = longitude,
+            accuracy = accuracy,
+            timestamp = System.currentTimeMillis(),
+            isActive = true,
+            status = "LIVE"
+        )
+        val current = activeSosAlertsFlow.value.toMutableList()
+        current.removeAll { it.id == id }
+        current.add(0, alert)
+        activeSosAlertsFlow.value = current
+
+        // Sync to Cloud Firestore if connected
+        try {
+            val db = FirebaseFirestore.getInstance()
+            val map = hashMapOf(
+                "id" to id,
+                "userName" to userName,
+                "userPhone" to userPhone,
+                "locationName" to locationName,
+                "latitude" to latitude,
+                "longitude" to longitude,
+                "accuracy" to accuracy,
+                "timestamp" to System.currentTimeMillis(),
+                "isActive" to true,
+                "status" to "LIVE"
+            )
+            db.collection("active_sos_alerts").document(id).set(map)
+            db.collection("sos_history_records").document(id).set(map)
+        } catch (_: Exception) { }
+    }
+
+    fun resolveSosBroadcast(id: String = "active_user_sos") {
+        val current = activeSosAlertsFlow.value.toMutableList()
+        current.removeAll { it.id == id }
+        activeSosAlertsFlow.value = current
+
+        try {
+            val db = FirebaseFirestore.getInstance()
+            db.collection("active_sos_alerts").document(id).delete()
+            db.collection("sos_history_records").document(id).set(
+                mapOf(
+                    "id" to id,
+                    "isActive" to false,
+                    "status" to "SOLVED",
+                    "resolvedAt" to System.currentTimeMillis()
+                ),
+                SetOptions.merge()
+            )
+        } catch (_: Exception) { }
+    }
 
     private val emergencyNumbers = mapOf(
         "BD" to "999",  // Bangladesh

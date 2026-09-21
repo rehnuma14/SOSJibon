@@ -1,8 +1,10 @@
 package com.example.sosjibon.ui.settings
 
+import android.app.Activity
 import android.app.DatePickerDialog
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -29,7 +31,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Verified
+import java.util.Locale
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -37,7 +41,10 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -77,10 +84,21 @@ fun EditProfileScreen(
     val state by vm.state.collectAsState()
     val currentProfile = state.profile
 
+    // KEEP SCREEN ON UNTIL USER CLOSES IT
+    DisposableEffect(Unit) {
+        val activity = context as? Activity
+        activity?.window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        onDispose {
+            activity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
+
     var name by remember { mutableStateOf(currentProfile.fullName) }
     var email by remember { mutableStateOf(currentProfile.email) }
     var phone by remember { mutableStateOf(currentProfile.phone) }
     var bloodGroup by remember { mutableStateOf(currentProfile.bloodGroup) }
+    var gender by remember { mutableStateOf(currentProfile.gender) }
+    var lastDonationDate by remember { mutableStateOf(currentProfile.lastDonationDate) }
     var dob by remember { mutableStateOf(currentProfile.dob) }
     var country by remember { mutableStateOf(currentProfile.country) }
     var city by remember { mutableStateOf(currentProfile.city) }
@@ -283,79 +301,84 @@ fun EditProfileScreen(
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(10.dp))
+                        if (!isEmailVerified) {
+                            Spacer(modifier = Modifier.height(10.dp))
 
-                        // Code Verification Action Row
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            OutlinedTextField(
-                                value = verificationCodeInput,
-                                onValueChange = { if (it.length <= 6) verificationCodeInput = it },
-                                label = { Text(text = "6-Digit Code") },
-                                singleLine = true,
-                                modifier = Modifier.weight(1f),
-                                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = primaryGreen, focusedLabelColor = primaryGreen)
-                            )
+                            // Code Verification Action Row
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedTextField(
+                                    value = verificationCodeInput,
+                                    onValueChange = { if (it.length <= 6) verificationCodeInput = it },
+                                    label = { Text(text = "6-Digit Code") },
+                                    singleLine = true,
+                                    modifier = Modifier.weight(1f),
+                                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = primaryGreen, focusedLabelColor = primaryGreen)
+                                )
+
+                                Button(
+                                    onClick = {
+                                        if (verificationCodeInput.isBlank()) {
+                                            verificationStatus = "Please enter the 6-digit code."
+                                            Toast.makeText(context, "Please enter the 6-digit code.", Toast.LENGTH_SHORT).show()
+                                            return@Button
+                                        }
+                                        isVerifyingCode = true
+                                        verificationStatus = "Verifying code..."
+                                        vm.verifyEmailCode(verificationCodeInput) { verified, statusMsg ->
+                                            isVerifyingCode = false
+                                            isEmailVerified = verified
+                                            if (verified) {
+                                                verificationCodeInput = ""
+                                            }
+                                            verificationStatus = statusMsg
+                                            try { Toast.makeText(context, statusMsg, Toast.LENGTH_LONG).show() } catch (_: Exception) {}
+                                        }
+                                    },
+                                    modifier = Modifier.height(52.dp),
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = primaryGreen),
+                                    enabled = !isVerifyingCode
+                                ) {
+                                    Text(text = if (isVerifyingCode) "Verifying..." else "Verify Code", fontSize = 11.sp)
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
 
                             Button(
                                 onClick = {
-                                    if (verificationCodeInput.isBlank()) {
-                                        verificationStatus = "Please enter the 6-digit code."
-                                        Toast.makeText(context, "Please enter the 6-digit code.", Toast.LENGTH_SHORT).show()
+                                    if (email.isBlank()) {
+                                        verificationStatus = "Please enter an email address first."
+                                        Toast.makeText(context, "Please enter an email address first.", Toast.LENGTH_SHORT).show()
                                         return@Button
                                     }
-                                    isVerifyingCode = true
-                                    verificationStatus = "Verifying code..."
-                                    vm.verifyEmailCode(verificationCodeInput) { verified, statusMsg ->
-                                        isVerifyingCode = false
-                                        isEmailVerified = verified
+                                    isSendingCode = true
+                                    verificationStatus = "Sending code to $email..."
+                                    Toast.makeText(context, "Sending code to $email...", Toast.LENGTH_SHORT).show()
+                                    vm.updateUserEmailAndSendVerification(email) { _, statusMsg ->
+                                        isSendingCode = false
                                         verificationStatus = statusMsg
                                         try { Toast.makeText(context, statusMsg, Toast.LENGTH_LONG).show() } catch (_: Exception) {}
                                     }
                                 },
-                                modifier = Modifier.height(52.dp),
+                                enabled = !isSendingCode,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp),
                                 shape = RoundedCornerShape(10.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = primaryGreen),
-                                enabled = !isVerifyingCode
+                                colors = ButtonDefaults.buttonColors(containerColor = primaryGreen)
                             ) {
-                                Text(text = if (isVerifyingCode) "Verifying..." else "Verify Code", fontSize = 11.sp)
+                                Text(
+                                    text = if (isSendingCode) "Sending Email Code..." else "Send 6-Digit Verification Code to Email",
+                                    fontSize = 12.sp,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
-                        }
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Button(
-                            onClick = {
-                                if (email.isBlank()) {
-                                    verificationStatus = "Please enter an email address first."
-                                    Toast.makeText(context, "Please enter an email address first.", Toast.LENGTH_SHORT).show()
-                                    return@Button
-                                }
-                                isSendingCode = true
-                                verificationStatus = "Sending code to $email..."
-                                Toast.makeText(context, "Sending code to $email...", Toast.LENGTH_SHORT).show()
-                                vm.updateUserEmailAndSendVerification(email) { _, statusMsg ->
-                                    isSendingCode = false
-                                    verificationStatus = statusMsg
-                                    try { Toast.makeText(context, statusMsg, Toast.LENGTH_LONG).show() } catch (_: Exception) {}
-                                }
-                            },
-                            enabled = !isSendingCode,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(48.dp),
-                            shape = RoundedCornerShape(10.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = primaryGreen)
-                        ) {
-                            Text(
-                                text = if (isSendingCode) "Sending Email Code..." else "Send 6-Digit Verification Code to Email",
-                                fontSize = 12.sp,
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold
-                            )
                         }
 
                         verificationStatus?.let { status ->
@@ -379,10 +402,13 @@ fun EditProfileScreen(
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = primaryGreen, focusedLabelColor = primaryGreen)
                     )
 
-                    // Blood Group Dropdown
+                    // Blood Group Selection Dropdown
+                    var bloodDropdownExpanded by remember { mutableStateOf(false) }
+                    val bloodGroups = listOf("A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-")
+
                     Box(modifier = Modifier.fillMaxWidth()) {
                         OutlinedTextField(
-                            value = bloodGroup,
+                            value = bloodGroup.ifBlank { "Select Blood Group" },
                             onValueChange = {},
                             readOnly = true,
                             label = { Text(text = "Blood Group") },
@@ -393,7 +419,9 @@ fun EditProfileScreen(
                                     modifier = Modifier.clickable { bloodDropdownExpanded = !bloodDropdownExpanded }
                                 )
                             },
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { bloodDropdownExpanded = !bloodDropdownExpanded },
                             colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = primaryGreen, focusedLabelColor = primaryGreen)
                         )
 
@@ -403,11 +431,30 @@ fun EditProfileScreen(
                         ) {
                             bloodGroups.forEach { bg ->
                                 DropdownMenuItem(
-                                    text = { Text(text = bg) },
+                                    text = { Text(text = bg, fontWeight = FontWeight.Bold) },
                                     onClick = {
                                         bloodGroup = bg
                                         bloodDropdownExpanded = false
                                     }
+                                )
+                            }
+                        }
+                    }
+
+                    // Gender Selection
+                    Column {
+                        Text(text = "Gender", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = primaryGreen)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            listOf("Male", "Female").forEach { g ->
+                                FilterChip(
+                                    selected = gender.equals(g, ignoreCase = true),
+                                    onClick = { gender = g },
+                                    label = { Text(g) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = primaryGreen,
+                                        selectedLabelColor = Color.White
+                                    )
                                 )
                             }
                         }
@@ -503,7 +550,7 @@ fun EditProfileScreen(
                     OutlinedTextField(
                         value = desc,
                         onValueChange = { desc = it },
-                        label = { Text(text = "Bio / Medical Note") },
+                        label = { Text(text = "Profession") },
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = primaryGreen, focusedLabelColor = primaryGreen)
                     )
@@ -519,6 +566,8 @@ fun EditProfileScreen(
                                 isEmailVerified = isEmailVerified,
                                 phone = phone.trim(),
                                 bloodGroup = bloodGroup,
+                                gender = gender,
+                                lastDonationDate = lastDonationDate,
                                 dob = dob,
                                 country = country,
                                 city = city,

@@ -1,6 +1,7 @@
 package com.example.sosjibon.auth
 
 import android.widget.Toast
+import com.example.sosjibon.ui.theme.SOSJIBONTheme
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -33,6 +34,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -63,18 +65,22 @@ import com.google.firebase.auth.FirebaseAuth
 fun LoginScreen(
     onBackClick: () -> Unit,
     onLoginClick: (String, String) -> Unit,
+    onGoogleSignInClick: () -> Unit = {},
     onRegisterClick: () -> Unit,
+    onGuestClick: () -> Unit = {},
     onForgotPasswordClick: () -> Unit = {},
     isLoading: Boolean = false,
     errorMessage: String? = null
 ) {
-    val primaryGreen = Color(0xFF159A6C)
-    val darkGreen = Color(0xFF087A55)
-    val lightGreen = Color(0xFFE8F7F1)
-    val background = Color(0xFFF8FCFA)
-    val textDark = Color(0xFF17332A)
-    val textGray = Color(0xFF6B7C75)
-    val errorRed = Color(0xFFD92D20)
+    SOSJIBONTheme(darkTheme = false) {
+        val primaryGreen = Color(0xFF159A6C)
+        val darkGreen = Color(0xFF087A55)
+        val lightGreen = Color(0xFFE8F7F1)
+        val background = Color(0xFFF8FCFA)
+        val cardBg = Color.White
+        val textDark = Color(0xFF17332A)
+        val textGray = Color(0xFF6B7C75)
+        val errorRed = Color(0xFFD92D20)
 
     var email by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
@@ -106,7 +112,7 @@ fun LoginScreen(
                     onClick = onBackClick,
                     modifier = Modifier
                         .size(45.dp)
-                        .background(color = Color.White, shape = CircleShape)
+                        .background(color = cardBg, shape = CircleShape)
                         .border(
                             width = 1.dp,
                             color = primaryGreen.copy(alpha = 0.25f),
@@ -359,11 +365,35 @@ fun LoginScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
-            // Emergency access
+            // Google Sign-In Button
             OutlinedButton(
-                onClick = onBackClick,
+                onClick = onGoogleSignInClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(
+                    width = 1.dp,
+                    color = primaryGreen.copy(alpha = 0.45f)
+                )
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "🌐  Continue with Google",
+                        color = textDark,
+                        fontSize = 13.5.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Guest mode access
+            OutlinedButton(
+                onClick = onGuestClick,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(48.dp),
@@ -408,6 +438,7 @@ fun LoginScreen(
             onDismiss = { showForgotModal = false }
         )
     }
+}
 }
 
 @Composable

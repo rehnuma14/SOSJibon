@@ -12,7 +12,20 @@
           "package_name": "com.example.sosjibon"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "566453717423-mo1bbabu93b7244g1qq41njogm51e9od.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.sosjibon",
+            "certificate_hash": "370331ae92425d9af6d8ddab3803efbcebff4802"
+          }
+        },
+        {
+          "client_id": "566453717423-e5agraj7nnl4ioq0g87b858kdms80go6.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAuIDNNqlLxgunY_GNpHGoZWNPOX6AHEtI"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "566453717423-e5agraj7nnl4ioq0g87b858kdms80go6.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

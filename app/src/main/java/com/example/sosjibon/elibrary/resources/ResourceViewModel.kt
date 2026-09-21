@@ -31,15 +31,29 @@ class ResourceViewModel(application: Application) : AndroidViewModel(application
 
     val mostUrgent: List<EmergencyCondition> = FirstAidContent.mostUrgent
 
-    val filteredConditions: StateFlow<List<EmergencyCondition>> = combine(
-        _searchQuery, _selectedCategory, _severityFilter
-    ) { query, category, severity ->
+    val savedConditions: StateFlow<List<EmergencyCondition>> = combine(
+        _bookmarkedIds, _searchQuery
+    ) { bookmarked, query ->
         FirstAidContent.allConditions.filter { condition ->
-            val matchesQuery = query.isBlank() || matchesSearch(condition, query)
-            val matchesCategory = category == null || condition.category == category
-            val matchesSeverity = severity == null || condition.severity == severity
-            matchesQuery && matchesCategory && matchesSeverity
+            bookmarked.contains(condition.id) && (query.isBlank() || matchesSearch(condition, query))
         }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
+
+    val filteredConditions: StateFlow<List<EmergencyCondition>> = combine(
+        _searchQuery, _selectedCategory, _severityFilter, _bookmarkedIds
+    ) { query, category, severity, bookmarked ->
+        FirstAidContent.allConditions
+            .filter { condition ->
+                val matchesQuery = query.isBlank() || matchesSearch(condition, query)
+                val matchesCategory = category == null || condition.category == category
+                val matchesSeverity = severity == null || condition.severity == severity
+                matchesQuery && matchesCategory && matchesSeverity
+            }
+            .sortedByDescending { bookmarked.contains(it.id) }
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),

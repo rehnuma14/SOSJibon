@@ -6,8 +6,8 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [HealthReading::class, VaultDocument::class, Medication::class],
-    version = 1,
+    entities = [HealthReading::class, VaultDocument::class, Medication::class, DonationRecord::class],
+    version = 2,
     exportSchema = false
 )
 abstract class VaultDatabase : RoomDatabase() {
@@ -22,7 +22,9 @@ abstract class VaultDatabase : RoomDatabase() {
                 context.applicationContext,
                 VaultDatabase::class.java,
                 "sosjibon_vault_history.db"
-            ).build().also { instance = it }
+            )
+            .fallbackToDestructiveMigration()
+            .build().also { instance = it }
         }
     }
 }

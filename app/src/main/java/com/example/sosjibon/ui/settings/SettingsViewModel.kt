@@ -6,17 +6,26 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.sosjibon.data.email.EmailService
 import com.example.sosjibon.data.firebase.FirebaseAuthManager
+import com.example.sosjibon.data.firebase.FirestoreManager
+import com.example.sosjibon.data.vault.DonationRecord
+import com.example.sosjibon.data.vault.VaultDatabase
 import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.UserProfileChangeRequest
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.SetOptions
+import org.json.JSONArray
+import org.json.JSONObject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.UUID
 
@@ -30,16 +39,18 @@ data class EmergencyContactItem(
 )
 
 data class UserProfileDetails(
-    val fullName: String = "SOSJibon User",
+    val fullName: String = "",
     val email: String = "",
     val isEmailVerified: Boolean = false,
     val phone: String = "",
-    val bloodGroup: String = "O+",
-    val dob: String = "2000-01-01",
-    val country: String = "Bangladesh",
-    val city: String = "Dhaka",
+    val bloodGroup: String = "",
+    val gender: String = "Male",
+    val lastDonationDate: String = "",
+    val dob: String = "",
+    val country: String = "",
+    val city: String = "",
     val imageUri: String = "",
-    val shortDescription: String = "Emergency Healthcare Member"
+    val shortDescription: String = ""
 )
 
 data class DeveloperItem(
@@ -54,15 +65,7 @@ data class DeveloperItem(
 
 data class SettingsState(
     val profile: UserProfileDetails = UserProfileDetails(),
-    val emergencyContacts: List<EmergencyContactItem> = listOf(
-        EmergencyContactItem(
-            name = "National Emergency Helpline",
-            phone = "999",
-            bloodGroup = "All Groups",
-            gender = "Official Service",
-            relation = "Government Hotline"
-        )
-    ),
+    val emergencyContacts: List<EmergencyContactItem> = emptyList(),
     val developers: List<DeveloperItem> = listOf(
         DeveloperItem(
             name = "Shafiul Islam",
@@ -107,34 +110,237 @@ data class SettingsState(
     val language: String = "English",
     val themeMode: String = "system",
     val isDarkTheme: Boolean = false,
-    val generatedCode: String? = "123456",
+    val isAdminRole: Boolean = false,
+    val generatedCode: String? = null,
     val message: String? = null
 )
 
 class SettingsViewModel(app: Application) : AndroidViewModel(app) {
+    private val dao = VaultDatabase.get(app).dao()
     private val authManager = FirebaseAuthManager()
     private val emailService = EmailService()
+    private val firestore = FirestoreManager()
     private val prefs = app.getSharedPreferences("sosjibon_profile_settings", Context.MODE_PRIVATE)
+
+    private var userSnapshotRegistration: ListenerRegistration? = null
+    private var contactsSnapshotRegistration: ListenerRegistration? = null
 
     private val _state = MutableStateFlow(SettingsState())
     val state: StateFlow<SettingsState> = _state.asStateFlow()
 
+    val donationRecords: StateFlow<List<DonationRecord>> = dao.donationRecords().stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        emptyList()
+    )
+
     init {
         loadSettings()
+
+        try {
+            FirebaseAuth.getInstance().addAuthStateListener {
+                loadSettings()
+            }
+            prefs.registerOnSharedPreferenceChangeListener { _, _ ->
+                loadSettings()
+            }
+
+            val currentUser = authManager.currentUser
+            if (currentUser != null) {
+                FirebaseFirestore.getInstance().collection("users").document(currentUser.uid)
+                    .addSnapshotListener { snapshot, _ ->
+                        if (snapshot != null && snapshot.exists()) {
+                            val verified = snapshot.getBoolean("isEmailVerified") == true
+                            if (verified != _state.value.profile.isEmailVerified) {
+                                _state.value = _state.value.copy(
+                                    profile = _state.value.profile.copy(isEmailVerified = verified)
+                                )
+                                val emailLower = (currentUser.email ?: "").trim().lowercase()
+                                if (emailLower.isNotBlank()) {
+                                    prefs.edit().putBoolean("user_email_verified_$emailLower", verified).apply()
+                                }
+                            }
+                        }
+                    }
+            }
+        } catch (_: Exception) {}
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                firestore.getDonationRecords().collect { records ->
+                    records.forEach { r -> dao.addDonationRecord(r) }
+                }
+            } catch (_: Exception) {}
+        }
     }
 
-    fun loadSettings() {
+    private fun saveContactsToPrefs(contacts: List<EmergencyContactItem>) {
+        try {
+            val array = JSONArray()
+            contacts.forEach { c ->
+                val obj = JSONObject().apply {
+                    put("id", c.id)
+                    put("name", c.name)
+                    put("phone", c.phone)
+                    put("bloodGroup", c.bloodGroup)
+                    put("gender", c.gender)
+                    put("relation", c.relation)
+                }
+                array.put(obj)
+            }
+            prefs.edit().putString("saved_emergency_contacts", array.toString()).apply()
+        } catch (_: Exception) {}
+    }
+
+    private fun loadContactsFromPrefs(): List<EmergencyContactItem> {
+        val list = mutableListOf<EmergencyContactItem>()
+        try {
+            val jsonStr = prefs.getString("saved_emergency_contacts", "") ?: ""
+            if (jsonStr.isNotBlank()) {
+                val array = JSONArray(jsonStr)
+                for (i in 0 until array.length()) {
+                    val obj = array.getJSONObject(i)
+                    list.add(
+                        EmergencyContactItem(
+                            id = obj.optString("id", UUID.randomUUID().toString()),
+                            name = obj.optString("name", ""),
+                            phone = obj.optString("phone", ""),
+                            bloodGroup = obj.optString("bloodGroup", "O+"),
+                            gender = obj.optString("gender", "Male"),
+                            relation = obj.optString("relation", "Family")
+                        )
+                    )
+                }
+            }
+        } catch (_: Exception) {}
+        return list
+    }
+
+    private fun attachUserFirestoreListener(uid: String) {
+        try {
+            userSnapshotRegistration?.remove()
+            userSnapshotRegistration = FirebaseFirestore.getInstance().collection("users").document(uid)
+                .addSnapshotListener { snapshot, _ ->
+                    if (snapshot != null && snapshot.exists()) {
+                        val currentProf = _state.value.profile
+                        val name = snapshot.getString("fullName")?.ifBlank { null } ?: prefs.getString("user_name", "")?.ifBlank { null } ?: currentProf.fullName
+                        val email = snapshot.getString("email")?.ifBlank { null } ?: prefs.getString("user_email", "")?.ifBlank { null } ?: currentProf.email
+                        val phone = snapshot.getString("phone")?.ifBlank { null } ?: prefs.getString("user_phone", "")?.ifBlank { null } ?: currentProf.phone
+                        val bg = snapshot.getString("bloodGroup")?.ifBlank { null } ?: prefs.getString("user_blood_group", "")?.ifBlank { null } ?: currentProf.bloodGroup
+                        val gender = snapshot.getString("gender")?.ifBlank { null } ?: prefs.getString("user_gender", "")?.ifBlank { null } ?: currentProf.gender
+                        val lastDonation = snapshot.getString("lastDonationDate")?.ifBlank { null } ?: prefs.getString("user_last_donation_date", "")?.ifBlank { null } ?: currentProf.lastDonationDate
+                        val dob = snapshot.getString("dob")?.ifBlank { null } ?: prefs.getString("user_dob", "")?.ifBlank { null } ?: currentProf.dob
+                        val country = snapshot.getString("country")?.ifBlank { null } ?: prefs.getString("user_country", "")?.ifBlank { null } ?: currentProf.country
+                        val city = snapshot.getString("city")?.ifBlank { null } ?: prefs.getString("user_city", "")?.ifBlank { null } ?: currentProf.city
+                        val desc = snapshot.getString("shortDescription")?.ifBlank { null } ?: prefs.getString("user_desc", "")?.ifBlank { null } ?: currentProf.shortDescription
+                        val imgUri = snapshot.getString("imageUri")?.ifBlank { null } ?: prefs.getString("user_img_uri", "")?.ifBlank { null } ?: currentProf.imageUri
+                        val verified = snapshot.getBoolean("isEmailVerified") == true || currentProf.isEmailVerified
+
+                        val updatedProfile = UserProfileDetails(
+                            fullName = name,
+                            email = email,
+                            isEmailVerified = verified,
+                            phone = phone,
+                            bloodGroup = bg,
+                            gender = gender,
+                            lastDonationDate = lastDonation,
+                            dob = dob,
+                            country = country,
+                            city = city,
+                            imageUri = imgUri,
+                            shortDescription = desc
+                        )
+
+                        _state.value = _state.value.copy(profile = updatedProfile)
+
+                        val emailLower = email.trim().lowercase()
+                        if (emailLower.isNotBlank()) {
+                            prefs.edit().apply {
+                                if (name.isNotBlank()) putString("user_name", name)
+                                if (emailLower.isNotBlank()) putString("user_email", emailLower)
+                                if (phone.isNotBlank()) putString("user_phone", phone)
+                                if (bg.isNotBlank()) putString("user_blood_group", bg)
+                                if (gender.isNotBlank()) putString("user_gender", gender)
+                                if (lastDonation.isNotBlank()) putString("user_last_donation_date", lastDonation)
+                                if (dob.isNotBlank()) putString("user_dob", dob)
+                                if (country.isNotBlank()) putString("user_country", country)
+                                if (city.isNotBlank()) putString("user_city", city)
+                                if (desc.isNotBlank()) putString("user_desc", desc)
+                                if (imgUri.isNotBlank()) putString("user_img_uri", imgUri)
+                                putBoolean("user_email_verified", verified)
+                                putBoolean("user_email_verified_$emailLower", verified)
+                                apply()
+                            }
+                        }
+                    }
+                }
+        } catch (_: Exception) {}
+    }
+
+    private fun attachUserContactsListener(uid: String) {
+        try {
+            contactsSnapshotRegistration?.remove()
+            contactsSnapshotRegistration = FirebaseFirestore.getInstance()
+                .collection("users")
+                .document(uid)
+                .collection("emergency_contacts")
+                .addSnapshotListener { snapshot, _ ->
+                    if (snapshot != null) {
+                        val contacts = snapshot.documents.mapNotNull { doc ->
+                            doc.toObject(EmergencyContactItem::class.java)?.copy(id = doc.id)
+                        }
+                        _state.value = _state.value.copy(emergencyContacts = contacts)
+                        saveContactsToPrefs(contacts)
+                    }
+                }
+        } catch (_: Exception) {}
+    }
+
+    fun loadSettings(forceReload: Boolean = false) {
         val user = authManager.currentUser
-        val name = user?.displayName ?: prefs.getString("user_name", "SOSJibon User") ?: "SOSJibon User"
-        val email = user?.email ?: prefs.getString("user_email", "") ?: ""
-        val isVerified = (user?.isEmailVerified == true) || prefs.getBoolean("user_email_verified", false)
+        val savedName = prefs.getString("user_name", "") ?: ""
+        val savedEmail = prefs.getString("user_email", "") ?: ""
+
+        if (user == null) {
+            userSnapshotRegistration?.remove()
+            userSnapshotRegistration = null
+            contactsSnapshotRegistration?.remove()
+            contactsSnapshotRegistration = null
+
+            val isGuest = savedName == "Guest Member"
+            val profile = if (isGuest) {
+                UserProfileDetails(fullName = "Guest Member", shortDescription = "Guest Session")
+            } else {
+                UserProfileDetails()
+            }
+
+            val contacts = loadContactsFromPrefs()
+
+            _state.value = _state.value.copy(
+                profile = profile,
+                emergencyContacts = contacts,
+                isLoggedIn = false,
+                isAdminRole = false
+            )
+            return
+        }
+
+        attachUserFirestoreListener(user.uid)
+        attachUserContactsListener(user.uid)
+
+        val name = savedName.ifBlank { user.displayName ?: "" }
+        val email = savedEmail.ifBlank { user.email ?: "" }
+        val emailLower = email.trim().lowercase()
+        val isVerified = user.isEmailVerified || (emailLower.isNotBlank() && prefs.getBoolean("user_email_verified_$emailLower", false))
         val phone = prefs.getString("user_phone", "") ?: ""
-        val bg = prefs.getString("user_blood_group", "O+") ?: "O+"
-        val dob = prefs.getString("user_dob", "2000-01-01") ?: "2000-01-01"
-        val country = prefs.getString("user_country", "Bangladesh") ?: "Bangladesh"
-        val city = prefs.getString("user_city", "Dhaka") ?: "Dhaka"
+        val bg = prefs.getString("user_blood_group", "") ?: ""
+        val gender = prefs.getString("user_gender", "Male") ?: "Male"
+        val lastDonation = prefs.getString("user_last_donation_date", "") ?: ""
+        val dob = prefs.getString("user_dob", "") ?: ""
+        val country = prefs.getString("user_country", "") ?: ""
+        val city = prefs.getString("user_city", "") ?: ""
         val imgUri = prefs.getString("user_img_uri", "") ?: ""
-        val desc = prefs.getString("user_desc", "Emergency Healthcare Member") ?: "Emergency Healthcare Member"
+        val desc = prefs.getString("user_desc", "") ?: ""
 
         val notifs = prefs.getBoolean("notifications_enabled", true)
         val alerts = prefs.getBoolean("emergency_alerts_enabled", true)
@@ -142,12 +348,18 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         val themeMode = prefs.getString("theme_mode", "system") ?: "system"
         val dark = themeMode == "dark"
 
+        val isAdmin = emailLower == "admin@gmail.com"
+
+        val contacts = loadContactsFromPrefs()
+
         val profile = UserProfileDetails(
             fullName = name,
             email = email,
             isEmailVerified = isVerified,
             phone = phone,
             bloodGroup = bg,
+            gender = gender,
+            lastDonationDate = lastDonation,
             dob = dob,
             country = country,
             city = city,
@@ -157,12 +369,14 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
 
         _state.value = _state.value.copy(
             profile = profile,
-            isLoggedIn = user != null,
+            emergencyContacts = if (_state.value.emergencyContacts.isNotEmpty()) _state.value.emergencyContacts else contacts,
+            isLoggedIn = true,
             notificationsEnabled = notifs,
             emergencyAlertsEnabled = alerts,
             language = lang,
             themeMode = themeMode,
-            isDarkTheme = dark
+            isDarkTheme = dark,
+            isAdminRole = isAdmin
         )
     }
 
@@ -225,13 +439,18 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun markEmailVerifiedDirectly(onResult: (Boolean, String) -> Unit) {
-        prefs.edit().putBoolean("user_email_verified", true).apply()
+        val user = FirebaseAuth.getInstance().currentUser
+        val activeEmail = (user?.email ?: _state.value.profile.email).trim().lowercase()
+
+        if (activeEmail.isNotBlank()) {
+            prefs.edit().putBoolean("user_email_verified_$activeEmail", true).apply()
+        }
+
         _state.value = _state.value.copy(
             profile = _state.value.profile.copy(isEmailVerified = true),
             message = "Email address verified successfully! ✓"
         )
 
-        val user = FirebaseAuth.getInstance().currentUser
         if (user != null) {
             viewModelScope.launch {
                 try {
@@ -253,8 +472,11 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             try {
                 user.reload().await()
+                val activeEmail = (user.email ?: "").trim().lowercase()
                 if (user.isEmailVerified) {
-                    prefs.edit().putBoolean("user_email_verified", true).apply()
+                    if (activeEmail.isNotBlank()) {
+                        prefs.edit().putBoolean("user_email_verified_$activeEmail", true).apply()
+                    }
                     _state.value = _state.value.copy(
                         profile = _state.value.profile.copy(isEmailVerified = true),
                         message = "Email verified successfully! ✓"
@@ -265,10 +487,10 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
                     } catch (_: Exception) {}
                     onResult(true, "Email address verified successfully! ✓")
                 } else {
-                    markEmailVerifiedDirectly(onResult)
+                    onResult(false, "Email not verified yet via link.")
                 }
             } catch (_: Exception) {
-                markEmailVerifiedDirectly(onResult)
+                onResult(false, "Verification check failed.")
             }
         }
     }
@@ -278,7 +500,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         val trimmedInput = inputCode.trim()
         val expectedCode = _state.value.generatedCode
 
-        if (trimmedInput.isNotBlank() && (trimmedInput == expectedCode || trimmedInput == "123456")) {
+        if (trimmedInput.isNotBlank() && expectedCode != null && trimmedInput == expectedCode) {
             markEmailVerifiedDirectly(onResult)
         } else {
             if (user != null) {
@@ -299,17 +521,23 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun updateProfile(newProfile: UserProfileDetails) {
+        val emailLower = newProfile.email.trim().lowercase()
         prefs.edit().apply {
             putString("user_name", newProfile.fullName)
-            putString("user_email", newProfile.email)
+            putString("user_email", emailLower)
             putString("user_phone", newProfile.phone)
             putString("user_blood_group", newProfile.bloodGroup)
+            putString("user_gender", newProfile.gender)
+            putString("user_last_donation_date", newProfile.lastDonationDate)
             putString("user_dob", newProfile.dob)
             putString("user_country", newProfile.country)
             putString("user_city", newProfile.city)
             putString("user_img_uri", newProfile.imageUri)
             putString("user_desc", newProfile.shortDescription)
             putBoolean("user_email_verified", newProfile.isEmailVerified)
+            if (emailLower.isNotBlank()) {
+                putBoolean("user_email_verified_$emailLower", newProfile.isEmailVerified)
+            }
             apply()
         }
 
@@ -318,16 +546,24 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
             message = "Profile details saved successfully!"
         )
 
-        val user = authManager.currentUser
-        if (user != null) {
-            viewModelScope.launch {
-                try {
-                    val profileUpdates = UserProfileChangeRequest.Builder()
-                        .setDisplayName(newProfile.fullName)
-                        .build()
-                    user.updateProfile(profileUpdates).await()
+        val currentUser = authManager.currentUser ?: FirebaseAuth.getInstance().currentUser
+        val userUid = currentUser?.uid ?: if (emailLower.isNotBlank()) "user_${emailLower.hashCode()}" else null
 
+        if (userUid != null) {
+            viewModelScope.launch(Dispatchers.IO) {
+                if (currentUser != null && newProfile.fullName.isNotBlank()) {
+                    try {
+                        val profileUpdates = UserProfileChangeRequest.Builder()
+                            .setDisplayName(newProfile.fullName)
+                            .build()
+                        currentUser.updateProfile(profileUpdates).await()
+                    } catch (_: Exception) {}
+                }
+
+                try {
+                    val role = if (emailLower == "admin@gmail.com") "admin" else "user"
                     val map = hashMapOf(
+                        "uid" to userUid,
                         "fullName" to newProfile.fullName,
                         "email" to newProfile.email,
                         "phone" to newProfile.phone,
@@ -335,11 +571,76 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
                         "dob" to newProfile.dob,
                         "country" to newProfile.country,
                         "city" to newProfile.city,
+                        "gender" to newProfile.gender,
+                        "lastDonationDate" to newProfile.lastDonationDate,
                         "shortDescription" to newProfile.shortDescription,
-                        "isEmailVerified" to newProfile.isEmailVerified
+                        "imageUri" to newProfile.imageUri,
+                        "isEmailVerified" to newProfile.isEmailVerified,
+                        "role" to role,
+                        "updatedAt" to System.currentTimeMillis()
                     )
-                    FirebaseFirestore.getInstance().collection("users").document(user.uid).update(map as Map<String, Any>)
+                    FirebaseFirestore.getInstance().collection("users").document(userUid).set(map, SetOptions.merge()).await()
                 } catch (_: Exception) {}
+            }
+        }
+    }
+
+    fun updateLastDonationDate(dateStr: String) {
+        prefs.edit().putString("user_last_donation_date", dateStr).apply()
+        _state.value = _state.value.copy(
+            profile = _state.value.profile.copy(lastDonationDate = dateStr),
+            message = "Last blood donation date updated to $dateStr!"
+        )
+
+        val user = authManager.currentUser
+        if (user != null) {
+            viewModelScope.launch {
+                try {
+                    FirebaseFirestore.getInstance().collection("users").document(user.uid)
+                        .update("lastDonationDate", dateStr)
+                } catch (_: Exception) {}
+            }
+        }
+    }
+
+    fun addBloodDonationRecord(dateStr: String, hospital: String = "", notes: String = "") {
+        val record = DonationRecord(
+            id = UUID.randomUUID().toString(),
+            donationDate = dateStr,
+            locationOrHospital = hospital.ifBlank { "Local Hospital / Blood Bank" },
+            notes = notes.ifBlank { "Blood donation" },
+            timestamp = System.currentTimeMillis()
+        )
+
+        viewModelScope.launch(Dispatchers.IO) {
+            dao.addDonationRecord(record)
+            firestore.addDonationRecord(record)
+            recalculateAndSaveLastDonationDate()
+        }
+    }
+
+    fun updateBloodDonationRecord(record: DonationRecord) {
+        viewModelScope.launch(Dispatchers.IO) {
+            dao.addDonationRecord(record)
+            firestore.addDonationRecord(record)
+            recalculateAndSaveLastDonationDate()
+        }
+    }
+
+    fun deleteBloodDonationRecord(record: DonationRecord) {
+        viewModelScope.launch(Dispatchers.IO) {
+            dao.deleteDonationRecord(record)
+            firestore.deleteDonationRecord(record.id)
+            recalculateAndSaveLastDonationDate()
+        }
+    }
+
+    private fun recalculateAndSaveLastDonationDate() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val records = dao.getDonationRecordsSync()
+            val latestDate = records.map { it.donationDate }.filter { it.isNotBlank() }.maxOrNull() ?: ""
+            withContext(Dispatchers.Main) {
+                updateLastDonationDate(latestDate)
             }
         }
     }
@@ -391,15 +692,17 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
 
     fun addEmergencyContact(contact: EmergencyContactItem) {
         val updated = _state.value.emergencyContacts.toMutableList()
-        updated.add(contact)
+        updated.removeAll { it.id == contact.id }
+        updated.add(0, contact)
         _state.value = _state.value.copy(
             emergencyContacts = updated,
             message = "Emergency contact ${contact.name} added!"
         )
+        saveContactsToPrefs(updated)
 
         val user = authManager.currentUser
         if (user != null) {
-            viewModelScope.launch {
+            viewModelScope.launch(Dispatchers.IO) {
                 try {
                     FirebaseFirestore.getInstance()
                         .collection("users")
@@ -469,6 +772,27 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         setThemeMode(if (isDark) "dark" else "light")
     }
 
+    fun toggleAdminRole(enabled: Boolean) {
+        val emailLower = _state.value.profile.email.trim().lowercase()
+        if (emailLower.isNotBlank()) {
+            prefs.edit().putBoolean("is_admin_role_$emailLower", enabled).apply()
+        }
+        _state.value = _state.value.copy(
+            isAdminRole = enabled,
+            message = if (enabled) "⚡ Admin Moderator Role Enabled!" else "Regular User Role Enabled."
+        )
+
+        val user = authManager.currentUser
+        if (user != null) {
+            viewModelScope.launch {
+                try {
+                    FirebaseFirestore.getInstance().collection("users").document(user.uid)
+                        .update("role", if (enabled) "admin" else "user").await()
+                } catch (_: Exception) {}
+            }
+        }
+    }
+
     fun sendPasswordResetEmail() {
         val email = _state.value.profile.email
         if (email.isNotBlank()) {
@@ -486,7 +810,31 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun signOut() {
-        authManager.signOut()
+        try {
+            userSnapshotRegistration?.remove()
+            userSnapshotRegistration = null
+            contactsSnapshotRegistration?.remove()
+            contactsSnapshotRegistration = null
+
+            prefs.edit().apply {
+                remove("user_name")
+                remove("user_email")
+                remove("user_phone")
+                remove("user_blood_group")
+                remove("user_gender")
+                remove("user_last_donation_date")
+                remove("user_dob")
+                remove("user_country")
+                remove("user_city")
+                remove("user_desc")
+                remove("user_img_uri")
+                remove("user_email_verified")
+                apply()
+            }
+            authManager.signOut()
+        } catch (_: Exception) {}
+
+        _state.value = SettingsState()
         loadSettings()
     }
 
@@ -495,8 +843,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 val user = authManager.currentUser
                 user?.delete()?.await()
-                authManager.signOut()
-                loadSettings()
+                signOut()
                 onSuccess()
             } catch (e: Exception) {
                 _state.value = _state.value.copy(message = e.message ?: "Failed to delete account.")

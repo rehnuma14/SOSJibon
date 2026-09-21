@@ -1,6 +1,7 @@
 package com.example.sosjibon.auth
 
 import android.util.Patterns
+import com.example.sosjibon.ui.theme.SOSJIBONTheme
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -36,6 +37,8 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
@@ -68,15 +71,17 @@ fun RegisterScreen(
     isLoading: Boolean = false,
     errorMessage: String? = null
 ) {
-    val primaryGreen = Color(0xFF159A6C)
-    val darkGreen = Color(0xFF087A55)
-    val lightGreen = Color(0xFFE8F7F1)
-    val background = Color(0xFFF8FCFA)
-    val textDark = Color(0xFF17332A)
-    val textGray = Color(0xFF6B7C75)
-    val errorRed = Color(0xFFD92D20)
-    val successGreen = Color(0xFF2E7D32)
-    val borderColor = Color(0xFFD8E4DF)
+    SOSJIBONTheme(darkTheme = false) {
+        val primaryGreen = Color(0xFF159A6C)
+        val darkGreen = Color(0xFF087A55)
+        val lightGreen = Color(0xFFE8F7F1)
+        val background = Color(0xFFF8FCFA)
+        val cardBg = Color.White
+        val textDark = Color(0xFF17332A)
+        val textGray = Color(0xFF6B7C75)
+        val errorRed = Color(0xFFD92D20)
+        val successGreen = Color(0xFF2E7D32)
+        val borderColor = Color(0xFFD8E4DF)
 
     // Form States
     var fullName by rememberSaveable { mutableStateOf("") }
@@ -176,7 +181,7 @@ fun RegisterScreen(
                     onClick = onBackClick,
                     modifier = Modifier
                         .size(45.dp)
-                        .background(color = Color.White, shape = CircleShape)
+                        .background(color = cardBg, shape = CircleShape)
                         .border(
                             width = 1.dp,
                             color = primaryGreen.copy(alpha = 0.25f),
@@ -459,6 +464,7 @@ fun RegisterScreen(
             Spacer(modifier = Modifier.height(24.dp))
         }
     }
+}
 }
 
 @Composable

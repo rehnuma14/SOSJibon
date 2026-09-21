@@ -1,5 +1,6 @@
 package com.example.sosjibon.data.firebase
 
+import com.example.sosjibon.data.vault.DonationRecord
 import com.example.sosjibon.data.vault.HealthReading
 import com.example.sosjibon.data.vault.Medication
 import com.example.sosjibon.data.vault.VaultDocument
@@ -26,11 +27,15 @@ class FirestoreManager {
         phone: String
     ): Result<Unit> {
         return try {
+            val emailLower = email.trim().lowercase()
+            val role = if (emailLower == "admin@gmail.com") "admin" else "user"
+
             val userMap = hashMapOf(
                 "uid" to uid,
                 "fullName" to fullName,
                 "email" to email,
                 "phone" to phone,
+                "role" to role,
                 "createdAt" to System.currentTimeMillis()
             )
             db.collection("users").document(uid).set(userMap).await()
@@ -147,6 +152,62 @@ class FirestoreManager {
             val ref = db.collection("users").document(uid).collection("medications").document()
             val item = med.copy(id = ref.id.hashCode().toLong())
             ref.set(item).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    // Blood Donation Records Sync
+    fun getDonationRecords(): Flow<List<DonationRecord>> = callbackFlow {
+        val uid = currentUserId
+        if (uid == null) {
+            trySend(emptyList())
+            close()
+            return@callbackFlow
+        }
+
+        val listener = db.collection("users")
+            .document(uid)
+            .collection("donation_records")
+            .orderBy("timestamp", Query.Direction.DESCENDING)
+            .addSnapshotListener { snapshot, _ ->
+                if (snapshot != null) {
+                    val list = snapshot.documents.mapNotNull { doc ->
+                        doc.toObject(DonationRecord::class.java)?.copy(id = doc.id)
+                    }
+                    trySend(list)
+                } else {
+                    trySend(emptyList())
+                }
+            }
+        awaitClose { listener.remove() }
+    }
+
+    suspend fun addDonationRecord(record: DonationRecord): Result<Unit> {
+        return try {
+            val uid = currentUserId ?: return Result.failure(Exception("User not authenticated"))
+            db.collection("users")
+                .document(uid)
+                .collection("donation_records")
+                .document(record.id)
+                .set(record)
+                .await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun deleteDonationRecord(recordId: String): Result<Unit> {
+        return try {
+            val uid = currentUserId ?: return Result.failure(Exception("User not authenticated"))
+            db.collection("users")
+                .document(uid)
+                .collection("donation_records")
+                .document(recordId)
+                .delete()
+                .await()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)

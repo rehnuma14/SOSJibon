@@ -14,6 +14,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,17 +23,23 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.firebase.auth.FirebaseAuth
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.currentBackStackEntryAsState
+import com.example.sosjibon.ui.settings.SettingsViewModel
 
 private val SosRed = Color(0xFFE5484D)
 private val SelectedColor = Color(0xFF159A6C)
 private val UnselectedColor = Color.Gray
 
 @Composable
-fun SosJibonBottomNavBar(navController: NavController) {
+fun SosJibonBottomNavBar(
+    navController: NavController,
+    settingsViewModel: SettingsViewModel = viewModel()
+) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
 
@@ -42,9 +49,19 @@ fun SosJibonBottomNavBar(navController: NavController) {
         return
     }
 
+    val authUser = FirebaseAuth.getInstance().currentUser
+    val authEmail = authUser?.email?.trim()?.lowercase() ?: ""
+    val isAdmin = authUser != null && authEmail == "admin@gmail.com"
+
+    if (isAdmin) {
+        return
+    }
+
+    val navItems = userBottomNavItems
+
     Box(modifier = Modifier.fillMaxWidth()) {
         NavigationBar {
-            bottomNavItems.forEachIndexed { index, screen ->
+            navItems.forEachIndexed { index, screen ->
                 if (index == 2) {
                     NavigationBarItem(
                         selected = false,

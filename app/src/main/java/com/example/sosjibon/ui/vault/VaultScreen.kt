@@ -10,16 +10,65 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.HealthAndSafety
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Medication
+import androidx.compose.material.icons.filled.MonitorWeight
+import androidx.compose.material.icons.filled.Timeline
+import androidx.compose.material.icons.filled.UploadFile
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
-import androidx.compose.runtime.*
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -36,20 +85,39 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.sosjibon.data.vault.HealthReading
 import com.example.sosjibon.data.vault.Medication
 import com.example.sosjibon.data.vault.VaultDocument
+import com.example.sosjibon.ui.components.GuestAccessWarningCard
+import com.example.sosjibon.ui.settings.SettingsViewModel
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Date
+import java.util.Locale
 import kotlin.math.max
 
-private val PrimaryGreen = Color(0xFF159A6C)
-private val LightGreen = Color(0xFFE8F7F1)
-private val BackgroundBg = Color(0xFFF8FCFA)
-private val TextDark = Color(0xFF17332A)
-private val TextGray = Color(0xFF6B7C75)
+private val EmergencyRed = Color(0xFFD92D20)
 
 @Composable
 fun VaultScreen(
-    vm: VaultViewModel = viewModel()
+    onNavigateToAuth: () -> Unit = {},
+    vm: VaultViewModel = viewModel(),
+    settingsViewModel: SettingsViewModel = viewModel()
 ) {
+    val settingsState by settingsViewModel.state.collectAsState()
+    val isGuest = !settingsState.isLoggedIn || settingsState.profile.fullName == "Guest Member" || settingsState.profile.email.isBlank()
+
+    if (isGuest) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            GuestAccessWarningCard(
+                pageName = "Health Vault & Records",
+                onLoginRegisterClick = onNavigateToAuth
+            )
+        }
+        return
+    }
+
     var selectedTab by remember { mutableIntStateOf(0) }
 
     val primaryGreen = MaterialTheme.colorScheme.primary
@@ -57,6 +125,7 @@ fun VaultScreen(
     val backgroundBg = MaterialTheme.colorScheme.background
     val textDark = MaterialTheme.colorScheme.onBackground
     val textGray = MaterialTheme.colorScheme.onSurfaceVariant
+    val cardBg = MaterialTheme.colorScheme.surface
 
     Column(
         modifier = Modifier
@@ -74,10 +143,10 @@ fun VaultScreen(
             Box(
                 modifier = Modifier
                     .size(48.dp)
-                    .background(color = LightGreen, shape = CircleShape)
+                    .background(color = lightGreen, shape = CircleShape)
                     .border(
                         width = 1.5.dp,
-                        color = PrimaryGreen.copy(alpha = 0.35f),
+                        color = primaryGreen.copy(alpha = 0.35f),
                         shape = CircleShape
                     ),
                 contentAlignment = Alignment.Center
@@ -85,7 +154,7 @@ fun VaultScreen(
                 Icon(
                     imageVector = Icons.Default.Lock,
                     contentDescription = "Vault",
-                    tint = PrimaryGreen,
+                    tint = primaryGreen,
                     modifier = Modifier.size(26.dp)
                 )
             }
@@ -95,13 +164,13 @@ fun VaultScreen(
             Column {
                 Text(
                     text = "Medical Vault & History",
-                    color = TextDark,
+                    color = textDark,
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
                     text = "Encrypted records, vitals history & medications",
-                    color = TextGray,
+                    color = textGray,
                     fontSize = 12.sp
                 )
             }
@@ -112,12 +181,12 @@ fun VaultScreen(
         // Segmented Tab Row
         TabRow(
             selectedTabIndex = selectedTab,
-            containerColor = Color.White,
-            contentColor = PrimaryGreen,
+            containerColor = cardBg,
+            contentColor = primaryGreen,
             indicator = { tabPositions ->
                 TabRowDefaults.SecondaryIndicator(
                     modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                    color = PrimaryGreen
+                    color = primaryGreen
                 )
             }
         ) {
@@ -135,8 +204,8 @@ fun VaultScreen(
                         Text("Health Vault", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                 },
-                selectedContentColor = PrimaryGreen,
-                unselectedContentColor = TextGray
+                selectedContentColor = primaryGreen,
+                unselectedContentColor = textGray
             )
 
             Tab(
@@ -153,8 +222,8 @@ fun VaultScreen(
                         Text("Activity History", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                 },
-                selectedContentColor = PrimaryGreen,
-                unselectedContentColor = TextGray
+                selectedContentColor = primaryGreen,
+                unselectedContentColor = textGray
             )
 
             Tab(
@@ -171,8 +240,8 @@ fun VaultScreen(
                         Text("Medications", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                 },
-                selectedContentColor = PrimaryGreen,
-                unselectedContentColor = TextGray
+                selectedContentColor = primaryGreen,
+                unselectedContentColor = textGray
             )
         }
 
@@ -203,6 +272,10 @@ fun VaultDocumentsTab(vm: VaultViewModel) {
     var chooserOpen by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
+    val primaryGreen = MaterialTheme.colorScheme.primary
+    val textDark = MaterialTheme.colorScheme.onBackground
+    val textGray = MaterialTheme.colorScheme.onSurfaceVariant
+    val cardBg = MaterialTheme.colorScheme.surface
 
     val picker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -233,7 +306,7 @@ fun VaultDocumentsTab(vm: VaultViewModel) {
     ) {
         Card(
             shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = PrimaryGreen),
+            colors = CardDefaults.cardColors(containerColor = primaryGreen),
             modifier = Modifier.fillMaxWidth()
         ) {
             Row(
@@ -266,18 +339,18 @@ fun VaultDocumentsTab(vm: VaultViewModel) {
                     Icon(
                         Icons.Default.Add,
                         contentDescription = "Add",
-                        tint = PrimaryGreen,
+                        tint = primaryGreen,
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Add", color = PrimaryGreen, fontWeight = FontWeight.Bold)
+                    Text("Add", color = primaryGreen, fontWeight = FontWeight.Bold)
                 }
             }
         }
 
         Text(
             "Disease Categories",
-            color = TextDark,
+            color = textDark,
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold
         )
@@ -297,7 +370,7 @@ fun VaultDocumentsTab(vm: VaultViewModel) {
 
         Text(
             "Stored Records (${list.size})",
-            color = TextDark,
+            color = textDark,
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold
         )
@@ -305,7 +378,7 @@ fun VaultDocumentsTab(vm: VaultViewModel) {
         if (list.isEmpty()) {
             Card(
                 shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = cardBg),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Box(
@@ -316,7 +389,7 @@ fun VaultDocumentsTab(vm: VaultViewModel) {
                 ) {
                     Text(
                         "No documents added yet. Select a category above to add.",
-                        color = TextGray,
+                        color = textGray,
                         fontSize = 13.sp
                     )
                 }
@@ -336,7 +409,7 @@ fun VaultDocumentsTab(vm: VaultViewModel) {
     if (chooserOpen) {
         AlertDialog(
             onDismissRequest = { chooserOpen = false },
-            title = { Text("Choose Category") },
+            title = { Text("Choose Category", color = textDark, fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf("Heart Disease", "Respiratory", "Diabetes", "Other").forEach { category ->
@@ -349,14 +422,14 @@ fun VaultDocumentsTab(vm: VaultViewModel) {
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Text(category, color = PrimaryGreen, fontWeight = FontWeight.SemiBold)
+                            Text(category, color = primaryGreen, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
             },
             confirmButton = {
                 TextButton(onClick = { chooserOpen = false }) {
-                    Text("Cancel", color = TextGray)
+                    Text("Cancel", color = textGray)
                 }
             }
         )
@@ -369,9 +442,15 @@ fun DiseaseCategoryCard(
     count: Int,
     onAdd: () -> Unit
 ) {
+    val cardBg = MaterialTheme.colorScheme.surface
+    val textDark = MaterialTheme.colorScheme.onSurface
+    val textGray = MaterialTheme.colorScheme.onSurfaceVariant
+    val primaryGreen = MaterialTheme.colorScheme.primary
+    val lightGreen = MaterialTheme.colorScheme.primaryContainer
+
     Card(
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = cardBg),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.5.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -382,13 +461,13 @@ fun DiseaseCategoryCard(
             Box(
                 modifier = Modifier
                     .size(40.dp)
-                    .background(LightGreen, shape = CircleShape),
+                    .background(lightGreen, shape = CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     Icons.Default.Description,
                     contentDescription = null,
-                    tint = PrimaryGreen,
+                    tint = primaryGreen,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -396,15 +475,15 @@ fun DiseaseCategoryCard(
             Spacer(modifier = Modifier.width(12.dp))
 
             Column(modifier = Modifier.weight(1f)) {
-                Text(name, fontWeight = FontWeight.Bold, color = TextDark, fontSize = 15.sp)
-                Text("$count file(s)", style = MaterialTheme.typography.bodySmall, color = TextGray)
+                Text(name, fontWeight = FontWeight.Bold, color = textDark, fontSize = 15.sp)
+                Text("$count file(s)", style = MaterialTheme.typography.bodySmall, color = textGray)
             }
 
             FilledTonalButton(
                 onClick = onAdd,
                 colors = ButtonDefaults.filledTonalButtonColors(
-                    containerColor = LightGreen,
-                    contentColor = PrimaryGreen
+                    containerColor = lightGreen,
+                    contentColor = primaryGreen
                 ),
                 shape = RoundedCornerShape(12.dp)
             ) {
@@ -422,10 +501,14 @@ fun VaultRow(
     onDelete: () -> Unit
 ) {
     val context = LocalContext.current
+    val cardBg = MaterialTheme.colorScheme.surface
+    val textDark = MaterialTheme.colorScheme.onSurface
+    val textGray = MaterialTheme.colorScheme.onSurfaceVariant
+    val primaryGreen = MaterialTheme.colorScheme.primary
 
     Card(
         shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = cardBg),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -434,9 +517,9 @@ fun VaultRow(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(doc.disease, fontWeight = FontWeight.Bold, color = PrimaryGreen, fontSize = 13.sp)
-                Text(doc.displayName, fontWeight = FontWeight.SemiBold, color = TextDark, fontSize = 14.sp)
-                Text(formatDate(doc.dateMillis), style = MaterialTheme.typography.labelSmall, color = TextGray)
+                Text(doc.disease, fontWeight = FontWeight.Bold, color = primaryGreen, fontSize = 13.sp)
+                Text(doc.displayName, fontWeight = FontWeight.SemiBold, color = textDark, fontSize = 14.sp)
+                Text(formatDate(doc.dateMillis), style = MaterialTheme.typography.labelSmall, color = textGray)
             }
 
             IconButton(
@@ -444,7 +527,7 @@ fun VaultRow(
                     val intent = Intent(Intent.ACTION_VIEW).apply {
                         setDataAndType(
                             Uri.parse(doc.uri),
-                            if (doc.displayName.lowercase().endsWith(".pdf")) "application/pdf" else "image/*"
+                            if (doc.displayName.lowercase(Locale.ROOT).endsWith(".pdf")) "application/pdf" else "image/*"
                         )
                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     }
@@ -454,14 +537,27 @@ fun VaultRow(
                     }
                 }
             ) {
-                Icon(Icons.Default.OpenInNew, contentDescription = "Open", tint = PrimaryGreen)
+                Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = "Open", tint = primaryGreen)
             }
 
             IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color(0xFFE5484D))
+                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = EmergencyRed)
             }
         }
     }
+}
+
+private fun fileName(context: Context, uri: Uri): String? {
+    var name: String? = null
+    if (uri.scheme == "content") {
+        context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (index != -1) name = cursor.getString(index)
+            }
+        }
+    }
+    return name ?: uri.lastPathSegment
 }
 
 // ============================================================
@@ -474,17 +570,19 @@ fun ActivityHistoryTab(vm: VaultViewModel) {
     var subTab by remember { mutableIntStateOf(0) }
     var activeDialogType by remember { mutableStateOf<String?>(null) }
 
-    Column(
-        modifier = Modifier.fillMaxSize()
-    ) {
+    val primaryGreen = MaterialTheme.colorScheme.primary
+    val textGray = MaterialTheme.colorScheme.onSurfaceVariant
+    val cardBg = MaterialTheme.colorScheme.surface
+
+    Column(modifier = Modifier.fillMaxSize()) {
         TabRow(
             selectedTabIndex = subTab,
-            containerColor = LightGreen,
-            contentColor = PrimaryGreen,
+            containerColor = cardBg,
+            contentColor = primaryGreen,
             indicator = { tabPositions ->
                 TabRowDefaults.SecondaryIndicator(
                     modifier = Modifier.tabIndicatorOffset(tabPositions[subTab]),
-                    color = PrimaryGreen
+                    color = primaryGreen
                 )
             }
         ) {
@@ -492,16 +590,16 @@ fun ActivityHistoryTab(vm: VaultViewModel) {
                 selected = subTab == 0,
                 onClick = { subTab = 0 },
                 text = { Text("Standard Reference", fontWeight = FontWeight.Bold, fontSize = 13.sp) },
-                selectedContentColor = PrimaryGreen,
-                unselectedContentColor = TextGray
+                selectedContentColor = primaryGreen,
+                unselectedContentColor = textGray
             )
 
             Tab(
                 selected = subTab == 1,
                 onClick = { subTab = 1 },
                 text = { Text("My Vitals & Trends", fontWeight = FontWeight.Bold, fontSize = 13.sp) },
-                selectedContentColor = PrimaryGreen,
-                unselectedContentColor = TextGray
+                selectedContentColor = primaryGreen,
+                unselectedContentColor = textGray
             )
         }
 
@@ -539,6 +637,8 @@ fun ActivityHistoryTab(vm: VaultViewModel) {
 
 @Composable
 fun StandardTabContent(onOpenStandard: (String) -> Unit) {
+    val textGray = MaterialTheme.colorScheme.onSurfaceVariant
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -547,7 +647,7 @@ fun StandardTabContent(onOpenStandard: (String) -> Unit) {
     ) {
         Text(
             "Global Adult Healthy Reference Ranges",
-            color = TextGray,
+            color = textGray,
             fontSize = 12.sp,
             fontWeight = FontWeight.Medium
         )
@@ -612,9 +712,15 @@ fun MetricCard(
     icon: ImageVector,
     onClick: () -> Unit
 ) {
+    val cardBg = MaterialTheme.colorScheme.surface
+    val textDark = MaterialTheme.colorScheme.onSurface
+    val textGray = MaterialTheme.colorScheme.onSurfaceVariant
+    val primaryGreen = MaterialTheme.colorScheme.primary
+    val lightGreen = MaterialTheme.colorScheme.primaryContainer
+
     Card(
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = cardBg),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.5.dp),
         modifier = Modifier
             .fillMaxWidth()
@@ -627,27 +733,30 @@ fun MetricCard(
             Box(
                 modifier = Modifier
                     .size(40.dp)
-                    .background(LightGreen, shape = CircleShape),
+                    .background(lightGreen, shape = CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(icon, contentDescription = null, tint = PrimaryGreen, modifier = Modifier.size(22.dp))
+                Icon(icon, contentDescription = null, tint = primaryGreen, modifier = Modifier.size(22.dp))
             }
 
             Spacer(modifier = Modifier.width(12.dp))
 
             Column(modifier = Modifier.weight(1f)) {
-                Text(title, fontWeight = FontWeight.Bold, color = TextDark, fontSize = 14.sp)
-                Text(value, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = PrimaryGreen)
-                Text(sub, fontSize = 11.sp, color = TextGray)
+                Text(title, fontWeight = FontWeight.Bold, color = textDark, fontSize = 14.sp)
+                Text(value, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = primaryGreen)
+                Text(sub, fontSize = 11.sp, color = textGray)
             }
 
-            Icon(Icons.Default.ChevronRight, contentDescription = "View", tint = TextGray)
+            Icon(Icons.Default.ChevronRight, contentDescription = "View", tint = textGray)
         }
     }
 }
 
 @Composable
 fun StandardInfoDialog(metric: String, onDismiss: () -> Unit) {
+    val textDark = MaterialTheme.colorScheme.onBackground
+    val primaryGreen = MaterialTheme.colorScheme.primary
+
     val message = when (metric) {
         "Blood Sugar – Fasting" -> "Male Adult: Same\nFemale Adult: Same\nHealthy range: 70–99 mg/dL"
         "Blood Sugar – 2 hrs after meal" -> "Male Adult: Same\nFemale Adult: Same\nHealthy range: <140 mg/dL"
@@ -660,12 +769,12 @@ fun StandardInfoDialog(metric: String, onDismiss: () -> Unit) {
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(metric, color = TextDark, fontWeight = FontWeight.Bold) },
-        text = { Text(message, color = TextDark) },
+        title = { Text(metric, color = textDark, fontWeight = FontWeight.Bold) },
+        text = { Text(message, color = textDark) },
         confirmButton = {
             Button(
                 onClick = onDismiss,
-                colors = ButtonDefaults.buttonColors(containerColor = PrimaryGreen)
+                colors = ButtonDefaults.buttonColors(containerColor = primaryGreen)
             ) {
                 Text("OK", color = Color.White)
             }
@@ -688,6 +797,11 @@ fun MyStandardTabContent(
         "Weight"
     )
 
+    val textDark = MaterialTheme.colorScheme.onBackground
+    val textGray = MaterialTheme.colorScheme.onSurfaceVariant
+    val primaryGreen = MaterialTheme.colorScheme.primary
+    val cardBg = MaterialTheme.colorScheme.surface
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -696,7 +810,7 @@ fun MyStandardTabContent(
     ) {
         Text(
             "Log your health metrics. When 2 or more readings are recorded, a trend graph will appear.",
-            color = TextGray,
+            color = textGray,
             fontSize = 12.sp
         )
 
@@ -707,7 +821,7 @@ fun MyStandardTabContent(
 
             Card(
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = cardBg),
                 elevation = CardDefaults.cardElevation(defaultElevation = 1.5.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -716,17 +830,17 @@ fun MyStandardTabContent(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(type, fontWeight = FontWeight.Bold, color = TextDark, fontSize = 14.sp)
+                            Text(type, fontWeight = FontWeight.Bold, color = textDark, fontSize = 14.sp)
                             Text(
                                 data.lastOrNull()?.value?.let { "Latest: $it" } ?: "No data logged",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = if (data.isNotEmpty()) PrimaryGreen else TextGray
+                                color = if (data.isNotEmpty()) primaryGreen else textGray
                             )
                         }
 
                         Button(
                             onClick = { onAddReading(type) },
-                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryGreen),
+                            colors = ButtonDefaults.buttonColors(containerColor = primaryGreen),
                             shape = RoundedCornerShape(10.dp),
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
                         ) {
@@ -751,7 +865,7 @@ fun MyStandardTabContent(
 
         Text(
             "All Logged Readings (${readings.size})",
-            color = TextDark,
+            color = textDark,
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold
         )
@@ -786,13 +900,17 @@ fun TrendGraph(
     val maxValue = points.maxOf { it.second }
     val range = max(1.0, maxValue - minValue)
 
+    val textDark = MaterialTheme.colorScheme.onBackground
+    val textGray = MaterialTheme.colorScheme.onSurfaceVariant
+    val primaryGreen = MaterialTheme.colorScheme.primary
+
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text("Trend Graph", fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = TextDark)
-            Text("${points.size} readings • $unit", style = MaterialTheme.typography.labelSmall, color = PrimaryGreen)
+            Text("Trend Graph", fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = textDark)
+            Text("${points.size} readings • $unit", style = MaterialTheme.typography.labelSmall, color = primaryGreen)
         }
 
         Spacer(modifier = Modifier.height(6.dp))
@@ -814,7 +932,7 @@ fun TrendGraph(
             for (i in 0..4) {
                 val y = top + height * i / 4f
                 drawLine(
-                    color = Color.LightGray.copy(alpha = 0.45f),
+                    color = Color.Gray.copy(alpha = 0.35f),
                     start = Offset(left, y),
                     end = Offset(right, y),
                     strokeWidth = 1f
@@ -837,7 +955,7 @@ fun TrendGraph(
 
             drawPath(
                 path = path,
-                color = PrimaryGreen,
+                color = primaryGreen,
                 style = Stroke(width = 4f, cap = StrokeCap.Round)
             )
 
@@ -847,7 +965,7 @@ fun TrendGraph(
                 val y = bottom - normalized * height
 
                 drawCircle(
-                    color = PrimaryGreen,
+                    color = primaryGreen,
                     radius = 5f,
                     center = Offset(x, y)
                 )
@@ -858,8 +976,8 @@ fun TrendGraph(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(formatDate(points.first().first), style = MaterialTheme.typography.labelSmall, color = TextGray)
-            Text(formatDate(points.last().first), style = MaterialTheme.typography.labelSmall, color = TextGray)
+            Text(formatDate(points.first().first), style = MaterialTheme.typography.labelSmall, color = textGray)
+            Text(formatDate(points.last().first), style = MaterialTheme.typography.labelSmall, color = textGray)
         }
     }
 }
@@ -869,9 +987,13 @@ fun ReadingRow(
     r: HealthReading,
     onDelete: (HealthReading) -> Unit
 ) {
+    val cardBg = MaterialTheme.colorScheme.surface
+    val textDark = MaterialTheme.colorScheme.onSurface
+    val textGray = MaterialTheme.colorScheme.onSurfaceVariant
+
     Card(
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = cardBg),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -880,12 +1002,12 @@ fun ReadingRow(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(r.type, fontWeight = FontWeight.SemiBold, color = TextDark, fontSize = 13.sp)
-                Text("${r.value} • ${formatDate(r.dateMillis)}", style = MaterialTheme.typography.bodySmall, color = TextGray)
+                Text(r.type, fontWeight = FontWeight.SemiBold, color = textDark, fontSize = 13.sp)
+                Text("${r.value} • ${formatDate(r.dateMillis)}", style = MaterialTheme.typography.bodySmall, color = textGray)
             }
 
             IconButton(onClick = { onDelete(r) }) {
-                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color(0xFFE5484D))
+                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = EmergencyRed)
             }
         }
     }
@@ -899,6 +1021,10 @@ fun AddReadingDialog(
 ) {
     var value by remember { mutableStateOf("") }
 
+    val textDark = MaterialTheme.colorScheme.onBackground
+    val textGray = MaterialTheme.colorScheme.onSurfaceVariant
+    val primaryGreen = MaterialTheme.colorScheme.primary
+
     val label = when (type) {
         "Blood Sugar – Fasting", "Blood Sugar – 2 hrs after meal" -> "Value in mg/dL"
         "Blood Pressure – Systolic", "Blood Pressure – Diastolic" -> "Value in mmHg"
@@ -909,10 +1035,10 @@ fun AddReadingDialog(
 
     AlertDialog(
         onDismissRequest = onCancel,
-        title = { Text("Add Reading", color = TextDark, fontWeight = FontWeight.Bold) },
+        title = { Text("Add Reading", color = textDark, fontWeight = FontWeight.Bold) },
         text = {
             Column {
-                Text(type, color = PrimaryGreen, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                Text(type, color = primaryGreen, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
                     value = value,
@@ -920,20 +1046,20 @@ fun AddReadingDialog(
                     label = { Text(label) },
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = PrimaryGreen,
-                        focusedLabelColor = PrimaryGreen
+                        focusedBorderColor = primaryGreen,
+                        focusedLabelColor = primaryGreen
                     )
                 )
             }
         },
         dismissButton = {
-            TextButton(onClick = onCancel) { Text("Cancel", color = TextGray) }
+            TextButton(onClick = onCancel) { Text("Cancel", color = textGray) }
         },
         confirmButton = {
             Button(
                 enabled = value.isNotBlank(),
                 onClick = { onSave(value.trim()) },
-                colors = ButtonDefaults.buttonColors(containerColor = PrimaryGreen)
+                colors = ButtonDefaults.buttonColors(containerColor = primaryGreen)
             ) {
                 Text("Save", color = Color.White)
             }
@@ -950,6 +1076,10 @@ fun MedicationsTab(vm: VaultViewModel) {
     val meds by vm.medications.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
 
+    val primaryGreen = MaterialTheme.colorScheme.primary
+    val textGray = MaterialTheme.colorScheme.onSurfaceVariant
+    val cardBg = MaterialTheme.colorScheme.surface
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -958,7 +1088,7 @@ fun MedicationsTab(vm: VaultViewModel) {
     ) {
         Card(
             shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = PrimaryGreen),
+            colors = CardDefaults.cardColors(containerColor = primaryGreen),
             modifier = Modifier.fillMaxWidth()
         ) {
             Row(
@@ -991,11 +1121,11 @@ fun MedicationsTab(vm: VaultViewModel) {
                     Icon(
                         Icons.Default.Add,
                         contentDescription = "Add",
-                        tint = PrimaryGreen,
+                        tint = primaryGreen,
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Add", color = PrimaryGreen, fontWeight = FontWeight.Bold)
+                    Text("Add", color = primaryGreen, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -1005,7 +1135,7 @@ fun MedicationsTab(vm: VaultViewModel) {
         if (meds.isEmpty()) {
             Card(
                 shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = cardBg),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Box(
@@ -1016,7 +1146,7 @@ fun MedicationsTab(vm: VaultViewModel) {
                 ) {
                     Text(
                         "No medication added yet. Tap Add above to record.",
-                        color = TextGray,
+                        color = textGray,
                         fontSize = 13.sp
                     )
                 }
@@ -1049,9 +1179,15 @@ fun MedicationRow(
     m: Medication,
     onDelete: () -> Unit
 ) {
+    val cardBg = MaterialTheme.colorScheme.surface
+    val textDark = MaterialTheme.colorScheme.onSurface
+    val textGray = MaterialTheme.colorScheme.onSurfaceVariant
+    val primaryGreen = MaterialTheme.colorScheme.primary
+    val lightGreen = MaterialTheme.colorScheme.primaryContainer
+
     Card(
         shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = cardBg),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.5.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -1062,34 +1198,34 @@ fun MedicationRow(
             Box(
                 modifier = Modifier
                     .size(40.dp)
-                    .background(LightGreen, shape = CircleShape),
+                    .background(lightGreen, shape = CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.Medication, contentDescription = null, tint = PrimaryGreen, modifier = Modifier.size(22.dp))
+                Icon(Icons.Default.Medication, contentDescription = null, tint = primaryGreen, modifier = Modifier.size(22.dp))
             }
 
             Spacer(modifier = Modifier.width(12.dp))
 
             Column(modifier = Modifier.weight(1f)) {
-                Text(m.name, fontWeight = FontWeight.Bold, color = TextDark, fontSize = 15.sp)
-                Text("${m.dose} • ${m.timing}", style = MaterialTheme.typography.bodySmall, color = TextGray)
+                Text(m.name, fontWeight = FontWeight.Bold, color = textDark, fontSize = 15.sp)
+                Text("${m.dose} • ${m.timing}", style = MaterialTheme.typography.bodySmall, color = textGray)
 
                 if (m.required) {
                     Text(
                         "Required Medication",
-                        color = PrimaryGreen,
+                        color = primaryGreen,
                         fontWeight = FontWeight.Bold,
                         fontSize = 11.sp
                     )
                 }
 
                 if (m.note.isNotBlank()) {
-                    Text(m.note, style = MaterialTheme.typography.bodySmall, color = TextGray)
+                    Text(m.note, style = MaterialTheme.typography.bodySmall, color = textGray)
                 }
             }
 
             IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color(0xFFE5484D))
+                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = EmergencyRed)
             }
         }
     }
@@ -1102,26 +1238,27 @@ fun AddMedicationDialog(
 ) {
     var name by remember { mutableStateOf("") }
     var dose by remember { mutableStateOf("") }
-    var timing by remember { mutableStateOf("") }
-    var note by remember { mutableStateOf("") }
+    var timing by remember { mutableStateOf("Daily - Morning") }
     var required by remember { mutableStateOf(false) }
+    var note by remember { mutableStateOf("") }
+
+    val textDark = MaterialTheme.colorScheme.onBackground
+    val textGray = MaterialTheme.colorScheme.onSurfaceVariant
+    val primaryGreen = MaterialTheme.colorScheme.primary
 
     AlertDialog(
         onDismissRequest = onCancel,
-        title = { Text("Add Medication", color = TextDark, fontWeight = FontWeight.Bold) },
+        title = { Text("Add Medication", color = textDark, fontWeight = FontWeight.Bold) },
         text = {
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("Medicine name") },
+                    label = { Text("Medication Name") },
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = PrimaryGreen,
-                        focusedLabelColor = PrimaryGreen
+                        focusedBorderColor = primaryGreen,
+                        focusedLabelColor = primaryGreen
                     )
                 )
 
@@ -1131,19 +1268,19 @@ fun AddMedicationDialog(
                     label = { Text("Dose (e.g. 500mg, 1 tablet)") },
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = PrimaryGreen,
-                        focusedLabelColor = PrimaryGreen
+                        focusedBorderColor = primaryGreen,
+                        focusedLabelColor = primaryGreen
                     )
                 )
 
                 OutlinedTextField(
                     value = timing,
                     onValueChange = { timing = it },
-                    label = { Text("Timing (e.g. Daily at 8:00 AM)") },
+                    label = { Text("Timing (e.g. Morning / Night)") },
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = PrimaryGreen,
-                        focusedLabelColor = PrimaryGreen
+                        focusedBorderColor = primaryGreen,
+                        focusedLabelColor = primaryGreen
                     )
                 )
 
@@ -1151,38 +1288,30 @@ fun AddMedicationDialog(
                     Checkbox(
                         checked = required,
                         onCheckedChange = { required = it },
-                        colors = CheckboxDefaults.colors(checkedColor = PrimaryGreen)
+                        colors = CheckboxDefaults.colors(checkedColor = primaryGreen)
                     )
-                    Text("Required medication", fontSize = 13.sp, color = TextDark)
+                    Text("Required Daily Medicine", fontSize = 13.sp, color = textDark)
                 }
 
                 OutlinedTextField(
                     value = note,
                     onValueChange = { note = it },
-                    label = { Text("Notes (optional)") },
+                    label = { Text("Note / Prescription details") },
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = PrimaryGreen,
-                        focusedLabelColor = PrimaryGreen
+                        focusedBorderColor = primaryGreen,
+                        focusedLabelColor = primaryGreen
                     )
                 )
             }
         },
         dismissButton = {
-            TextButton(onClick = onCancel) { Text("Cancel", color = TextGray) }
+            TextButton(onClick = onCancel) { Text("Cancel", color = textGray) }
         },
         confirmButton = {
             Button(
                 enabled = name.isNotBlank(),
-                onClick = {
-                    onSave(
-                        name.trim(),
-                        dose.trim(),
-                        timing.trim(),
-                        required,
-                        note.trim()
-                    )
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = PrimaryGreen)
+                onClick = { onSave(name.trim(), dose.trim(), timing.trim(), required, note.trim()) },
+                colors = ButtonDefaults.buttonColors(containerColor = primaryGreen)
             ) {
                 Text("Save", color = Color.White)
             }
@@ -1190,38 +1319,16 @@ fun AddMedicationDialog(
     )
 }
 
-// ============================================================
-// HELPERS
-// ============================================================
-
-private fun trendUnit(type: String): String {
-    return when {
-        type.startsWith("Blood Sugar") -> "mg/dL"
-        type.startsWith("Blood Pressure") -> "mmHg"
-        type == "Resting Heart Rate" -> "BPM"
-        type == "Weight" -> "kg"
-        else -> ""
-    }
+private fun trendUnit(type: String): String = when (type) {
+    "Blood Sugar – Fasting", "Blood Sugar – 2 hrs after meal" -> "mg/dL"
+    "Blood Pressure – Systolic", "Blood Pressure – Diastolic" -> "mmHg"
+    "Resting Heart Rate" -> "BPM"
+    "Weight" -> "kg"
+    else -> ""
 }
 
-private fun formatDate(m: Long): String {
-    return SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault()).format(Date(m))
-}
-
-private fun fileName(context: Context, uri: Uri): String? {
-    return try {
-        context.contentResolver.query(
-            uri,
-            arrayOf(OpenableColumns.DISPLAY_NAME),
-            null,
-            null,
-            null
-        )?.use { cursor ->
-            if (cursor.moveToFirst()) {
-                cursor.getString(0)
-            } else null
-        }
-    } catch (_: Exception) {
-        null
-    }
+private fun formatDate(ms: Long): String {
+    if (ms <= 0) return ""
+    val sdf = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault())
+    return sdf.format(Date(ms))
 }

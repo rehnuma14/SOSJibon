@@ -35,6 +35,33 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
         emptyList()
     )
 
+    init {
+        // Automatic 2-Way Realtime Cloud Firestore Database Sync
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                firestore.getVaultDocuments().collect { cloudDocs ->
+                    cloudDocs.forEach { doc -> dao.addVault(doc) }
+                }
+            } catch (_: Exception) {}
+        }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                firestore.getHealthReadings().collect { cloudReadings ->
+                    cloudReadings.forEach { reading -> dao.addReading(reading) }
+                }
+            } catch (_: Exception) {}
+        }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                firestore.getMedications().collect { cloudMeds ->
+                    cloudMeds.forEach { med -> dao.addMedication(med) }
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
     fun addReading(type: String, value: String) = viewModelScope.launch(Dispatchers.IO) {
         val reading = HealthReading(type = type, value = value)
         dao.addReading(reading)

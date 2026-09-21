@@ -3,6 +3,7 @@ package com.example.sosjibon.data.vault
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
 
@@ -34,4 +35,16 @@ interface MedicalDao {
 
     @Delete
     fun deleteMedication(item: Medication)
+
+    @Query("SELECT * FROM donation_records ORDER BY timestamp DESC")
+    fun donationRecords(): Flow<List<DonationRecord>>
+
+    @Query("SELECT * FROM donation_records ORDER BY donationDate DESC")
+    fun getDonationRecordsSync(): List<DonationRecord>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    fun addDonationRecord(item: DonationRecord)
+
+    @Delete
+    fun deleteDonationRecord(item: DonationRecord)
 }

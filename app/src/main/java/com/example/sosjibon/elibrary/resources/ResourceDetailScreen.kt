@@ -1,53 +1,95 @@
 package com.example.sosjibon.elibrary.resources
 
-import androidx.compose.foundation.layout.*
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
-import androidx.compose.material.icons.filled.Phone
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.sosjibon.elibrary.resources.components.DoDontCard
-import com.example.sosjibon.elibrary.resources.components.GuideLanguage
-import com.example.sosjibon.elibrary.resources.components.GuideStepCard
-import com.example.sosjibon.elibrary.resources.components.LanguageToggle
 import com.example.sosjibon.elibrary.resources.components.WarningCard
 import com.example.sosjibon.elibrary.resources.data.EmergencyCondition
 import com.example.sosjibon.elibrary.resources.data.GuideStep
 import com.example.sosjibon.elibrary.resources.data.SeverityTag
-
-private enum class ReadingMode { STEPPER, FULL_PAGE }
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ResourceDetailScreen(
     conditionId: String,
     onBack: () -> Unit,
-    onCallEmergency: () -> Unit,
+    onCallEmergency: () -> Unit = {},
     onRelatedGuideClick: (String) -> Unit = {},
     viewModel: ResourceViewModel = viewModel()
 ) {
     val condition = viewModel.getCondition(conditionId)
     val bookmarkedIds by viewModel.bookmarkedIds.collectAsState()
-    var readingMode by remember { mutableStateOf(ReadingMode.STEPPER) }
-    var language by remember { mutableStateOf(GuideLanguage.ENGLISH) }
-    var stepperIndex by remember { mutableStateOf(0) }
+    val scope = rememberCoroutineScope()
+
+    val pageBg = MaterialTheme.colorScheme.background
+    val textDark = MaterialTheme.colorScheme.onBackground
+    val primaryGreen = MaterialTheme.colorScheme.primary
 
     if (condition == null) {
         Column(modifier = Modifier.fillMaxSize().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("Guide not found.")
+            Text("Guide not found.", color = textDark)
             Spacer(modifier = Modifier.height(12.dp))
             Button(onClick = onBack) { Text("Go Back") }
         }
@@ -56,187 +98,272 @@ fun ResourceDetailScreen(
 
     val accent = when (condition.severity) {
         SeverityTag.RED -> Color(0xFFD32F2F)
-        SeverityTag.BLUE -> Color(0xFF1565C0)
+        SeverityTag.BLUE -> primaryGreen
         SeverityTag.GREEN -> Color(0xFF2E7D32)
     }
     val isBookmarked = bookmarkedIds.contains(condition.id)
-    val displayTitle = if (language == GuideLanguage.BENGALI) condition.titleBn else condition.title
+    val totalSteps = condition.doThis.size.coerceAtLeast(1)
+    val pagerState = rememberPagerState(initialPage = 0, pageCount = { totalSteps })
 
     Scaffold(
-        containerColor = Color(0xFFF8FCFA),
+        containerColor = pageBg,
         topBar = {
             TopAppBar(
-                title = { Text(displayTitle, fontWeight = FontWeight.Bold, color = Color(0xFF17332A)) },
+                title = { Text(condition.title, fontWeight = FontWeight.Bold, color = textDark) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color(0xFF159A6C)) }
+                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = primaryGreen) }
                 },
                 actions = {
                     IconButton(onClick = { viewModel.toggleBookmark(condition.id) }) {
                         Icon(
                             imageVector = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
                             contentDescription = if (isBookmarked) "Remove bookmark" else "Bookmark",
-                            tint = Color(0xFF159A6C)
+                            tint = primaryGreen
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFF8FCFA), titleContentColor = Color(0xFF17332A))
-            )
-        },
-        floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = onCallEmergency,
-                containerColor = Color(0xFFD32F2F),
-                contentColor = Color.White,
-                icon = { Icon(Icons.Default.Phone, contentDescription = null) },
-                text = { Text("Call Emergency") }
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = pageBg, titleContentColor = textDark)
             )
         }
     ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            // STEP PROGRESS HEADER
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                LanguageToggle(selected = language, onLanguageChange = { language = it })
-                TextButton(onClick = {
-                    readingMode = if (readingMode == ReadingMode.STEPPER) ReadingMode.FULL_PAGE else ReadingMode.STEPPER
-                    stepperIndex = 0
-                }) {
-                    Text(if (readingMode == ReadingMode.STEPPER) "Read Full Page" else "Switch to Stepper")
+                Text(
+                    text = "Step ${pagerState.currentPage + 1} of $totalSteps",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = primaryGreen
+                )
+
+                // Animated Pager Dots
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    repeat(totalSteps) { page ->
+                        val isSelected = pagerState.currentPage == page
+                        Box(
+                            modifier = Modifier
+                                .size(if (isSelected) 10.dp else 8.dp)
+                                .clip(CircleShape)
+                                .background(if (isSelected) primaryGreen else primaryGreen.copy(alpha = 0.25f))
+                        )
+                    }
                 }
             }
 
-            when (readingMode) {
-                ReadingMode.STEPPER -> StepperView(
-                    stages = buildStages(
-                        condition.whatHappened, condition.recognizeSigns, condition.doThis,
-                        condition.dontDoThis, condition.whenToGetHelp, accent,
-                        relatedTitles = relatedTitlesFor(condition.relatedConditionIds, viewModel),
-                        onRelatedClick = onRelatedGuideClick
-                    ),
-                    currentIndex = stepperIndex,
-                    onNext = { stepperIndex = (stepperIndex + 1).coerceAtMost(4) },
-                    onPrevious = { stepperIndex = (stepperIndex - 1).coerceAtLeast(0) }
+            LinearProgressIndicator(
+                progress = { (pagerState.currentPage + 1).toFloat() / totalSteps.toFloat() },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(3.dp)),
+                color = primaryGreen,
+                trackColor = primaryGreen.copy(alpha = 0.15f)
+            )
+
+            // INTERACTIVE ANIMATED SWIPE CARDS PAGER
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            ) { page ->
+                val step = condition.doThis.getOrNull(page) ?: GuideStep(
+                    stepNumber = page + 1,
+                    instruction = condition.whatHappened,
+                    imageRes = condition.cardIconRes,
+                    imageDescription = condition.title
                 )
-                ReadingMode.FULL_PAGE -> FullPageView(
+
+                SwipeStepCard(
+                    step = step,
                     condition = condition,
-                    accent = accent,
-                    relatedTitles = relatedTitlesFor(condition.relatedConditionIds, viewModel),
-                    onRelatedClick = onRelatedGuideClick
+                    accentColor = accent
                 )
             }
-        }
-    }
-}
 
-private fun relatedTitlesFor(ids: List<String>, viewModel: ResourceViewModel): List<Pair<String, String>> =
-    ids.mapNotNull { id -> viewModel.getCondition(id)?.let { id to it.title } }
+            // BOTTOM SWIPE CONTROLS
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedButton(
+                    onClick = {
+                        if (pagerState.currentPage > 0) {
+                            scope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) }
+                        }
+                    },
+                    enabled = pagerState.currentPage > 0,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(1.5.dp, if (pagerState.currentPage > 0) primaryGreen else Color(0xFFD1D5DB)),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = Color.White,
+                        contentColor = if (pagerState.currentPage > 0) primaryGreen else Color(0xFF9CA3AF),
+                        disabledContainerColor = Color(0xFFF3F4F6),
+                        disabledContentColor = Color(0xFF9CA3AF)
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ChevronLeft,
+                        contentDescription = "Previous Step",
+                        tint = if (pagerState.currentPage > 0) primaryGreen else Color(0xFF9CA3AF),
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "Previous",
+                        fontSize = 13.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (pagerState.currentPage > 0) primaryGreen else Color(0xFF9CA3AF)
+                    )
+                }
 
-@Composable
-private fun RelatedGuidesRow(relatedTitles: List<Pair<String, String>>, onRelatedClick: (String) -> Unit) {
-    if (relatedTitles.isEmpty()) return
-    Column {
-        Text("See Also", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF757575))
-        Spacer(modifier = Modifier.height(6.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            relatedTitles.forEach { (id, title) ->
-                AssistChip(onClick = { onRelatedClick(id) }, label = { Text(title, fontSize = 12.sp) })
+                Button(
+                    onClick = {
+                        if (pagerState.currentPage < totalSteps - 1) {
+                            scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
+                        } else {
+                            onBack()
+                        }
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (pagerState.currentPage < totalSteps - 1) primaryGreen else Color(0xFF2E7D32),
+                        contentColor = Color.White
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
+                ) {
+                    Text(
+                        text = if (pagerState.currentPage < totalSteps - 1) "Next Step" else "Complete ✓",
+                        fontSize = 13.5.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Icon(
+                        imageVector = if (pagerState.currentPage < totalSteps - 1) Icons.Default.ChevronRight else Icons.Default.Check,
+                        contentDescription = "Next Step",
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
         }
     }
 }
 
-private data class Stage(val title: String, val content: @Composable () -> Unit)
-
 @Composable
-private fun buildStages(
-    whatHappened: String,
-    recognizeSigns: List<String>,
-    doThis: List<GuideStep>,
-    dontDoThis: List<String>,
-    whenToGetHelp: String,
-    accent: Color,
-    relatedTitles: List<Pair<String, String>>,
-    onRelatedClick: (String) -> Unit
-): List<Stage> = listOf(
-    Stage("What Happened") { Text(whatHappened, fontSize = 16.sp) },
-    Stage("Recognize the Signs") {
-        DoDontCard(title = "Signs to look for", items = recognizeSigns, accentColor = accent, backgroundColor = Color(0xFFF5F5F5))
-    },
-    Stage("Do This") {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            doThis.forEach { step -> GuideStepCard(step = step, accentColor = accent) }
-        }
-    },
-    Stage("Don't Do This") {
-        DoDontCard(title = "Avoid these", items = dontDoThis, accentColor = Color(0xFFD32F2F), backgroundColor = Color(0xFFFFEBEE))
-    },
-    Stage("When to Get Help") {
-        Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-            WarningCard(message = whenToGetHelp)
-            if (relatedTitles.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(16.dp))
-                RelatedGuidesRow(relatedTitles = relatedTitles, onRelatedClick = onRelatedClick)
-            }
-        }
-    }
-)
-
-@Composable
-private fun StepperView(stages: List<Stage>, currentIndex: Int, onNext: () -> Unit, onPrevious: () -> Unit) {
-    val stage = stages[currentIndex]
-    Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
-        Text("${currentIndex + 1} / ${stages.size}", fontSize = 12.sp, color = Color(0xFF9E9E9E))
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(stage.title, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(16.dp))
-        Box(modifier = Modifier.weight(1f)) { stage.content() }
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            if (currentIndex > 0) {
-                OutlinedButton(onClick = onPrevious) { Text("Back") }
-            } else {
-                Spacer(modifier = Modifier.width(1.dp))
-            }
-            if (currentIndex < stages.size - 1) {
-                Button(onClick = onNext) { Text("Next") }
-            }
-        }
-    }
-}
-
-@Composable
-private fun FullPageView(
+private fun SwipeStepCard(
+    step: GuideStep,
     condition: EmergencyCondition,
-    accent: Color,
-    relatedTitles: List<Pair<String, String>>,
-    onRelatedClick: (String) -> Unit
+    accentColor: Color
 ) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-        contentPadding = PaddingValues(vertical = 16.dp)
+    val cardBg = MaterialTheme.colorScheme.surface
+    val textDark = MaterialTheme.colorScheme.onSurface
+    val textGray = MaterialTheme.colorScheme.onSurfaceVariant
+
+    Card(
+        modifier = Modifier.fillMaxSize(),
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = cardBg),
+        border = BorderStroke(1.5.dp, accentColor.copy(alpha = 0.4f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
     ) {
-        item {
-            Text(condition.whatHappened, fontSize = 15.sp, color = Color(0xFF5F6368))
-            Spacer(modifier = Modifier.height(12.dp))
-            DoDontCard(title = "Recognize the Signs", items = condition.recognizeSigns, accentColor = accent, backgroundColor = Color(0xFFF5F5F5))
-            Spacer(modifier = Modifier.height(12.dp))
-            Text("Do This", fontSize = 17.sp, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(8.dp))
-        }
-        items(condition.doThis) { step ->
-            GuideStepCard(step = step, accentColor = accent)
-            Spacer(modifier = Modifier.height(10.dp))
-        }
-        item {
-            DoDontCard(title = "Don't Do This", items = condition.dontDoThis, accentColor = Color(0xFFD32F2F), backgroundColor = Color(0xFFFFEBEE))
-            Spacer(modifier = Modifier.height(12.dp))
-            WarningCard(message = condition.whenToGetHelp)
-            if (relatedTitles.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(16.dp))
-                RelatedGuidesRow(relatedTitles = relatedTitles, onRelatedClick = onRelatedClick)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(18.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            // IMAGE VISUALIZATION
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 140.dp, max = 220.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color.White)
+                    .border(1.dp, accentColor.copy(alpha = 0.25f), RoundedCornerShape(16.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Image(
+                    painter = painterResource(id = step.imageRes),
+                    contentDescription = step.imageDescription,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(14.dp)
+                )
             }
-            Spacer(modifier = Modifier.height(80.dp))
+
+            // STEP BADGE & TITLE
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .background(accentColor, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(text = "${step.stepNumber}", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                }
+
+                Spacer(modifier = Modifier.width(10.dp))
+
+                Text(
+                    text = "STEP ${step.stepNumber} ACTION",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = accentColor
+                )
+            }
+
+            // INSTRUCTION TEXT
+            Text(
+                text = step.instruction,
+                fontSize = 15.sp,
+                color = textDark,
+                lineHeight = 22.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            // SIGNS TO LOOK FOR ON STEP 1
+            if (step.stepNumber == 1 && condition.recognizeSigns.isNotEmpty()) {
+                DoDontCard(
+                    title = "Signs to Recognize",
+                    items = condition.recognizeSigns,
+                    accentColor = accentColor
+                )
+            }
+
+            // DONT DO THIS ON STEP 2 OR LATER
+            if (step.stepNumber >= 2 && condition.dontDoThis.isNotEmpty()) {
+                DoDontCard(
+                    title = "Avoid Doing This",
+                    items = condition.dontDoThis,
+                    accentColor = Color(0xFFD32F2F)
+                )
+            }
+
+            // WHEN TO GET HELP
+            if (condition.whenToGetHelp.isNotBlank()) {
+                WarningCard(message = condition.whenToGetHelp)
+            }
         }
     }
 }
