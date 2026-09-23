@@ -2,7 +2,7 @@
 
 # 🚑 SOSJibon
 
-**A bilingual (Bengali/English) medical emergency first-aid platform for Android**
+**A medical emergency first-aid platform for Android**
 
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Jetpack Compose](https://img.shields.io/badge/UI-Jetpack%20Compose-4285F4?logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
