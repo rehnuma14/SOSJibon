@@ -1,5 +1,17 @@
+/*
+ * DeveloperScreen.kt
+ * Why this file is needed: Lead developer team showcase and admin access permit request interface.
+ * Pseudo-code:
+ * 1. Render 2x2 grid of lead developers (Rehnuma, Jobaida, Aditya, Arman) with profile photos.
+ * 2. Open detail modal with direct Email ('mailto:') and LinkedIn ('ACTION_VIEW') action buttons.
+ * 3. Provide Admin Access Permit request modal that submits request documents to Firestore.
+ * Main Algorithm: Real-time Firestore permit request listener and intent launcher for Email/LinkedIn.
+ */
+
 package com.example.sosjibon.ui.settings
 
+import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -21,9 +33,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.Login
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material.icons.filled.HourglassTop
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.AlertDialog
@@ -53,6 +68,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import coil.compose.AsyncImage
+import com.example.sosjibon.R
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -134,40 +154,44 @@ fun DeveloperScreen(
 
     val developers = listOf(
         DeveloperItem(
-            name = "Shafiul Islam",
-            role = "Lead Developer",
-            designation = "Lead Systems & Android Engineer",
-            contribution = "Core System Architecture, App Navigation Host, Emergency SOS Engine, and Jetpack Compose UI Framework.",
-            email = "shafiul@sosjibon.org",
-            linkedin = "linkedin.com/in/shafiul-islam",
-            initial = "SI"
+            name = "Rehnuma Ahmed",
+            role = "Team Leader",
+            designation = "Lead Systems & Firebase Authentication",
+            contribution = "Firebase Authentication, Settings & User Profile, Emergency SOS Engine, and Jetpack Compose UI Development.",
+            email = "rehnuma.14.11@gmail.com",
+            linkedin = "https://www.linkedin.com/in/reh-nu-ma?utm_source=share_via&utm_content=profile&utm_medium=member_android",
+            initial = "RA",
+            imageRes = R.drawable.rehnuma
         ),
         DeveloperItem(
-            name = "Mahmudul Hasan",
-            role = "Backend Lead",
-            designation = "Cloud & Security Infrastructure Lead",
-            contribution = "Firebase Authentication, Cloud Firestore Realtime Sync Engine, and Encrypted Room Database Storage.",
-            email = "mahmudul@sosjibon.org",
-            linkedin = "linkedin.com/in/mahmudul-hasan",
-            initial = "MH"
+            name = "Jobaida Khanam",
+            role = "Cloud & Security Lead",
+            designation = "Cloud Data & Secure Storage",
+            contribution = "Cloud Firestore Real-time Synchronization, Firebase Authentication, and Encrypted Room Database Storage for Community Stories.",
+            email = "jobaidapuc@gmail.com",
+            linkedin = "https://www.linkedin.com/in/jobaida-khanam-juli-447057415?utm_source=share_via&utm_content=profile&utm_medium=member_android",
+            initial = "JK",
+            imageRes = R.drawable.jobaida
         ),
         DeveloperItem(
-            name = "Nusrat Jahan",
-            role = "UI/UX Specialist",
-            designation = "Mobile Product & Experience Designer",
-            contribution = "Healthcare Vault UI, Vitals Trend Canvas Charts Visualization, Theme Systems & Accessibility Design.",
-            email = "nusrat@sosjibon.org",
-            linkedin = "linkedin.com/in/nusrat-jahan",
-            initial = "NJ"
+            name = "Aditya Babu Tanmoy",
+            role = "AI & GPS Integrator",
+            designation = "AI Integration & Location Services",
+            contribution = "GPS Location Services, AI Assistant Integration, API Integration, and Trained AI Model Integration.",
+            email = "adityababutanmoy1234@gmail.com",
+            linkedin = "https://www.linkedin.com/in/aditya-babu-tanmoy-2025abt?utm_source=share_via&utm_content=profile&utm_medium=member_android",
+            initial = "ABT",
+            imageRes = R.drawable.aditya
         ),
         DeveloperItem(
-            name = "Tanvir Ahmed",
-            role = "QA & Data Lead",
-            designation = "Quality Assurance & Health Systems Lead",
-            contribution = "Emergency GPS Location Services, First Aid E-Library Content Management, and Integration Testing.",
-            email = "tanvir@sosjibon.org",
-            linkedin = "linkedin.com/in/tanvir-ahmed",
-            initial = "TA"
+            name = "Arman Samir",
+            role = "Health Content & Authentication Lead",
+            designation = "E-Library & Authentication",
+            contribution = "First Aid E-Library Content Management, User Authentication, and Google Sign-In Integration.",
+            email = "sameerarmaan1200@gmail.com",
+            linkedin = "https://www.linkedin.com/in/arman-samir-22a2213b6?utm_source=share_via&utm_content=profile&utm_medium=member_android",
+            initial = "AS",
+            imageRes = R.drawable.arman
         )
     )
 
@@ -513,12 +537,26 @@ private fun GridDeveloperCard(
         ) {
             Box(
                 modifier = Modifier
-                    .size(58.dp)
+                    .size(68.dp)
+                    .clip(CircleShape)
                     .background(lightGreen, CircleShape)
                     .border(2.dp, primaryGreen, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Text(text = developer.initial, fontWeight = FontWeight.Black, color = primaryGreen, fontSize = 20.sp)
+                val imageModel: Any? = developer.imageUrl ?: developer.imageRes
+                if (imageModel != null) {
+                    AsyncImage(
+                        model = imageModel,
+                        contentDescription = developer.name,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape),
+                        error = painterResource(id = R.drawable.ic_placeholder)
+                    )
+                } else {
+                    Text(text = developer.initial, fontWeight = FontWeight.Black, color = primaryGreen, fontSize = 20.sp)
+                }
             }
 
             Spacer(modifier = Modifier.height(10.dp))
@@ -564,6 +602,7 @@ private fun DeveloperDetailModal(
     developer: DeveloperItem,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
     val primaryGreen = MaterialTheme.colorScheme.primary
     val lightGreen = MaterialTheme.colorScheme.primaryContainer
     val textDark = MaterialTheme.colorScheme.onBackground
@@ -575,12 +614,26 @@ private fun DeveloperDetailModal(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
-                        .size(48.dp)
+                        .size(54.dp)
+                        .clip(CircleShape)
                         .background(lightGreen, CircleShape)
                         .border(1.5.dp, primaryGreen, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(text = developer.initial, fontWeight = FontWeight.Black, color = primaryGreen, fontSize = 18.sp)
+                    val imageModel: Any? = developer.imageUrl ?: developer.imageRes
+                    if (imageModel != null) {
+                        AsyncImage(
+                            model = imageModel,
+                            contentDescription = developer.name,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(CircleShape),
+                            error = painterResource(id = R.drawable.ic_placeholder)
+                        )
+                    } else {
+                        Text(text = developer.initial, fontWeight = FontWeight.Black, color = primaryGreen, fontSize = 18.sp)
+                    }
                 }
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
@@ -605,8 +658,66 @@ private fun DeveloperDetailModal(
                 HorizontalDivider(color = primaryGreen.copy(alpha = 0.2f))
 
                 Text(text = "Contact & Profiles:", fontWeight = FontWeight.Bold, color = textDark, fontSize = 12.5.sp)
-                Text(text = "✉️ Email: ${developer.email}", color = primaryGreen, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                Text(text = "🔗 LinkedIn: ${developer.linkedin}", color = primaryGreen, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+
+                // Email Button
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(primaryGreen.copy(alpha = 0.08f))
+                        .clickable {
+                            try {
+                                val intent = Intent(Intent.ACTION_SENDTO).apply {
+                                    data = Uri.parse("mailto:${developer.email}")
+                                    putExtra(Intent.EXTRA_SUBJECT, "Inquiry via SOSJibon App")
+                                }
+                                context.startActivity(intent)
+                            } catch (_: Exception) {
+                                try {
+                                    val fallbackIntent = Intent(Intent.ACTION_VIEW, Uri.parse("mailto:${developer.email}"))
+                                    context.startActivity(fallbackIntent)
+                                } catch (_: Exception) {
+                                    Toast.makeText(context, "No email app found to send email", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Email, contentDescription = "Email", tint = primaryGreen, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Email Address", fontSize = 10.5.sp, color = textGray)
+                        Text(developer.email, fontSize = 12.sp, color = primaryGreen, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = primaryGreen)
+                }
+
+                // LinkedIn Button
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(primaryGreen.copy(alpha = 0.08f))
+                        .clickable {
+                            try {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(developer.linkedin))
+                                context.startActivity(intent)
+                            } catch (_: Exception) {
+                                Toast.makeText(context, "Could not open browser for LinkedIn profile", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Language, contentDescription = "LinkedIn", tint = primaryGreen, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("LinkedIn Profile", fontSize = 10.5.sp, color = textGray)
+                        Text("View ${developer.name.split(" ").first()}'s Profile", fontSize = 12.sp, color = primaryGreen, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = primaryGreen)
+                }
             }
         },
         confirmButton = {

@@ -1,3 +1,13 @@
+/*
+ * HomeScreen.kt
+ * Why this file is needed: Home Dashboard UI displaying quick actions, active SOS alerts, and blood donation status.
+ * Pseudo-code:
+ * 1. Read current user state and blood donation records.
+ * 2. Fetch active community SOS emergency alerts via Firestore snapshot listener.
+ * 3. Render quick navigation cards for SOS, GPS Map, Vault, and E-Library.
+ * Main Algorithm: Real-time Firestore snapshot listener and dynamic card rendering.
+ */
+
 package com.example.sosjibon.ui.home
 
 import android.Manifest
@@ -18,6 +28,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -1090,10 +1101,16 @@ private fun ActiveSosCommunityAlertsSection(
             val sdf = SimpleDateFormat("hh:mm a", Locale.getDefault())
             val timeStr = sdf.format(Date(alert.timestamp))
 
+            val isDark = isSystemInDarkTheme()
+            val alertCardBg = if (isDark) Color(0xFF2C1515) else Color(0xFFFFF5F5)
+            val alertLocationTextColor = if (isDark) Color(0xFFF1F5F9) else Color(0xFF1E293B)
+            val alertGpsTextColor = if (isDark) Color(0xFFCBD5E1) else Color(0xFF64748B)
+            val mapBtnColor = if (isDark) Color(0xFF4ADE80) else Color(0xFF159A6C)
+
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF5F5)),
+                colors = CardDefaults.cardColors(containerColor = alertCardBg),
                 border = BorderStroke(1.5.dp, Color(0xFFD92D20)),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.5.dp)
             ) {
@@ -1134,12 +1151,12 @@ private fun ActiveSosCommunityAlertsSection(
                             text = "📍 Location: ${alert.locationName.ifBlank { "Nearby Location" }}",
                             fontSize = 12.5.sp,
                             fontWeight = FontWeight.Bold,
-                            color = textDark
+                            color = alertLocationTextColor
                         )
                         Text(
                             text = "GPS: ${alert.latitude}, ${alert.longitude} (${alert.accuracy})",
                             fontSize = 11.5.sp,
-                            color = textGray
+                            color = alertGpsTextColor
                         )
                     }
 
@@ -1173,11 +1190,11 @@ private fun ActiveSosCommunityAlertsSection(
                                 .weight(1f)
                                 .height(36.dp),
                             shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.dp, Color(0xFF159A6C))
+                            border = BorderStroke(1.dp, mapBtnColor)
                         ) {
-                            Icon(Icons.Default.MyLocation, contentDescription = null, tint = Color(0xFF159A6C), modifier = Modifier.size(13.dp))
+                            Icon(Icons.Default.MyLocation, contentDescription = null, tint = mapBtnColor, modifier = Modifier.size(13.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("View Map", fontSize = 11.sp, color = Color(0xFF159A6C), fontWeight = FontWeight.Bold)
+                            Text("View Map", fontSize = 11.sp, color = mapBtnColor, fontWeight = FontWeight.Bold)
                         }
                     }
                 }

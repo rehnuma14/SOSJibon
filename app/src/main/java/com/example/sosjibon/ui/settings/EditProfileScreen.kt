@@ -132,7 +132,11 @@ fun EditProfileScreen(
                 val file = File(imageUri)
                 if (file.exists()) {
                     BitmapFactory.decodeFile(file.absolutePath)
-                } else null
+                } else {
+                    context.contentResolver.openInputStream(Uri.parse(imageUri))?.use { input ->
+                        BitmapFactory.decodeStream(input)
+                    }
+                }
             } catch (_: Exception) {
                 null
             }

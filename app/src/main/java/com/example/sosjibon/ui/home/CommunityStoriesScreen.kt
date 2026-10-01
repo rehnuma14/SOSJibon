@@ -1,3 +1,13 @@
+/*
+ * CommunityStoriesScreen.kt
+ * Why this file is needed: Community feed UI for users to share and read emergency/healthcare stories.
+ * Pseudo-code:
+ * 1. Listen for approved stories from Firestore.
+ * 2. Allow logged-in users to submit new community stories.
+ * 3. Render story cards with author, timestamp, and content.
+ * Main Algorithm: Real-time collection listener and community post publishing.
+ */
+
 package com.example.sosjibon.ui.home
 
 import android.widget.Toast

@@ -1,15 +1,21 @@
+/*
+ * LandingScreen.kt
+ * What this file does: App landing page with Login/Register and Emergency SOS guest access.
+ *
+ * Pseudo-code:
+ * 1. Render App Logo and welcome branding.
+ * 2. If user clicks "Login / Register Account" -> Navigate to LoginScreen / RegisterScreen.
+ * 3. If user clicks "Continue Without Login" -> Navigate ONLY to Emergency SOS Screen.
+ * 4. If user clicks "DIRECT EMERGENCY SOS" -> Navigate ONLY to Emergency SOS Screen.
+ */
+
 package com.example.sosjibon.auth
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -41,7 +47,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -54,14 +60,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.sosjibon.ui.theme.SOSJIBONTheme
-
-// ------------------------------------------------------------
-// SOSJibon Landing Screen (Centralized Single-Action Layout)
-// ------------------------------------------------------------
 
 @Composable
 fun LandingScreen(
@@ -81,36 +82,21 @@ fun LandingScreen(
         val textGray = Color(0xFF6B7C75)
 
         val infiniteTransition = rememberInfiniteTransition(label = "landing_animation")
-
         val orbScale by infiniteTransition.animateFloat(
             initialValue = 0.96f,
             targetValue = 1.04f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(1600),
-                repeatMode = RepeatMode.Reverse
-            ),
+            animationSpec = infiniteRepeatable(animation = tween(1600), repeatMode = RepeatMode.Reverse),
             label = "orb_scale"
         )
-
         val floatingOffset by infiniteTransition.animateFloat(
             initialValue = -4f,
             targetValue = 4f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(1800),
-                repeatMode = RepeatMode.Reverse
-            ),
+            animationSpec = infiniteRepeatable(animation = tween(1800), repeatMode = RepeatMode.Reverse),
             label = "floating_offset"
         )
 
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = background
-        ) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                // CENTRALIZED MAIN CONTENT
+        Surface(modifier = Modifier.fillMaxSize(), color = background) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -119,7 +105,6 @@ fun LandingScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
-                    // App branding card
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -148,71 +133,30 @@ fun LandingScreen(
                                     modifier = Modifier.size(32.dp)
                                 )
                             }
-
                             Spacer(modifier = Modifier.width(14.dp))
-
                             Column {
-                                Text(
-                                    text = "SOSJibon",
-                                    color = textDark,
-                                    fontSize = 24.sp,
-                                    fontWeight = FontWeight.ExtraBold
-                                )
-                                Text(
-                                    text = "Your emergency healthcare companion",
-                                    color = textGray,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
+                                Text(text = "SOSJibon", color = textDark, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
+                                Text(text = "Your emergency healthcare companion", color = textGray, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(30.dp))
+                    Spacer(modifier = Modifier.height(24.dp))
 
-                    // Floating medical icons & main orb
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(220.dp),
+                            .height(200.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        FloatingMedicalIcon(
-                            icon = Icons.Default.MedicalServices,
-                            tint = primaryGreen,
-                            modifier = Modifier
-                                .align(Alignment.TopStart)
-                                .offset(x = 20.dp, y = floatingOffset.dp)
-                        )
+                        FloatingMedicalIcon(icon = Icons.Default.MedicalServices, tint = primaryGreen, modifier = Modifier.align(Alignment.TopStart).offset(x = 20.dp, y = floatingOffset.dp))
+                        FloatingMedicalIcon(icon = Icons.Default.LocalHospital, tint = darkGreen, modifier = Modifier.align(Alignment.TopEnd).offset(x = (-20).dp, y = (-floatingOffset).dp))
+                        FloatingMedicalIcon(icon = Icons.Default.Call, tint = primaryGreen, modifier = Modifier.align(Alignment.BottomStart).offset(x = 40.dp, y = floatingOffset.dp))
+                        FloatingMedicalIcon(icon = Icons.Default.Person, tint = darkGreen, modifier = Modifier.align(Alignment.BottomEnd).offset(x = (-40).dp, y = (-floatingOffset).dp))
 
-                        FloatingMedicalIcon(
-                            icon = Icons.Default.LocalHospital,
-                            tint = darkGreen,
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .offset(x = (-20).dp, y = (-floatingOffset).dp)
-                        )
-
-                        FloatingMedicalIcon(
-                            icon = Icons.Default.Call,
-                            tint = primaryGreen,
-                            modifier = Modifier
-                                .align(Alignment.BottomStart)
-                                .offset(x = 40.dp, y = floatingOffset.dp)
-                        )
-
-                        FloatingMedicalIcon(
-                            icon = Icons.Default.Person,
-                            tint = darkGreen,
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .offset(x = (-40).dp, y = (-floatingOffset).dp)
-                        )
-
-                        // Main medical orb
                         Box(
                             modifier = Modifier
-                                .size(160.dp)
+                                .size(150.dp)
                                 .scale(orbScale)
                                 .shadow(elevation = 16.dp, shape = CircleShape, ambientColor = primaryGreen, spotColor = primaryGreen)
                                 .background(color = primaryGreen, shape = CircleShape),
@@ -220,118 +164,77 @@ fun LandingScreen(
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(130.dp)
+                                    .size(120.dp)
                                     .background(color = Color.White.copy(alpha = 0.15f), shape = CircleShape),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.HealthAndSafety,
-                                    contentDescription = "Emergency healthcare",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(70.dp)
-                                )
+                                Icon(imageVector = Icons.Default.HealthAndSafety, contentDescription = "Emergency healthcare", tint = Color.White, modifier = Modifier.size(64.dp))
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(text = "Healthcare when you need it most", color = textDark, fontSize = 21.sp, fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.Center)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(text = "Connect with emergency services, healthcare resources, and essential medical information.", color = textGray, fontSize = 13.sp, lineHeight = 19.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 12.dp))
 
-                    // Welcome text
-                    Text(
-                        text = "Healthcare when you need it most",
-                        color = textDark,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        textAlign = TextAlign.Center
-                    )
+                    Spacer(modifier = Modifier.height(24.dp))
 
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        text = "Connect with emergency services, healthcare resources, and essential medical information.",
-                        color = textGray,
-                        fontSize = 13.5.sp,
-                        lineHeight = 20.sp,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(horizontal = 12.dp)
-                    )
-
-                    Spacer(modifier = Modifier.height(28.dp))
-
-                    // CENTRALIZED LOGIN BUTTON
+                    // Action Button 1: Login / Register
                     Button(
                         onClick = onLoginClick,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(54.dp),
+                            .height(52.dp),
                         shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = primaryGreen),
                         elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp)
                     ) {
-                        Text(
-                            text = "Login to SOSJibon",
-                            color = Color.White,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Text(text = "Login / Register Account", color = Color.White, fontSize = 15.5.sp, fontWeight = FontWeight.Bold)
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                    // EMERGENCY SOS BUTTON
+                    // Action Button 2: Continue Without Login (Emergency SOS Only)
+                    OutlinedButton(
+                        onClick = { onGuestClick() },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        border = BorderStroke(1.5.dp, primaryGreen)
+                    ) {
+                        Icon(imageVector = Icons.Default.HealthAndSafety, contentDescription = null, tint = primaryGreen, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = "Continue Without Login (Emergency SOS Only)", color = primaryGreen, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Action Button 3: Direct Emergency SOS
                     Button(
                         onClick = onSOSClick,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(54.dp),
+                            .height(52.dp),
                         shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = emergencyRed),
                         elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Warning,
-                            contentDescription = "Emergency SOS",
-                            tint = Color.White,
-                            modifier = Modifier.size(22.dp)
-                        )
-
+                        Icon(imageVector = Icons.Default.Warning, contentDescription = "Emergency SOS", tint = Color.White, modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-
-                        Text(
-                            text = "EMERGENCY SOS",
-                            color = Color.White,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.ExtraBold
-                        )
+                        Text(text = "DIRECT EMERGENCY SOS", color = Color.White, fontSize = 15.5.sp, fontWeight = FontWeight.ExtraBold)
                     }
 
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    // Footer
-                    Text(
-                        text = "Stay safe. Stay prepared. Stay connected.",
-                        color = textGray,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        textAlign = TextAlign.Center
-                    )
-
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Text(text = "Stay safe. Stay prepared. Stay connected.", color = textGray, fontSize = 12.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center)
                     Spacer(modifier = Modifier.height(4.dp))
-
-                    Text(
-                        text = "© 2026 SOSJibon",
-                        color = textGray.copy(alpha = 0.75f),
-                        fontSize = 11.sp
-                    )
+                    Text(text = "© 2026 SOSJibon", color = textGray.copy(alpha = 0.75f), fontSize = 11.sp)
                 }
             }
         }
     }
 }
-
-// ------------------------------------------------------------
-// Floating medical icon
-// ------------------------------------------------------------
 
 @Composable
 private fun FloatingMedicalIcon(
@@ -341,28 +244,12 @@ private fun FloatingMedicalIcon(
 ) {
     Box(
         modifier = modifier
-            .size(48.dp)
+            .size(44.dp)
             .shadow(elevation = 4.dp, shape = CircleShape)
             .background(color = Color.White, shape = CircleShape)
             .border(width = 1.dp, color = tint.copy(alpha = 0.25f), shape = CircleShape),
         contentAlignment = Alignment.Center
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = tint,
-            modifier = Modifier.size(22.dp)
-        )
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun LandingScreenPreview() {
-    SOSJIBONTheme {
-        LandingScreen(
-            onLoginClick = {},
-            onSOSClick = {}
-        )
+        Icon(imageVector = icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
     }
 }

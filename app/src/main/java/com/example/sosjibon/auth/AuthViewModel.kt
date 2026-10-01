@@ -1,3 +1,13 @@
+/*
+ * AuthViewModel.kt
+ * Why this file is needed: Manages user login, registration, and password reset state for authentication screens.
+ * Pseudo-code:
+ * 1. Receive user credentials from Login/Register UI.
+ * 2. Invoke FirebaseAuthManager to authenticate user.
+ * 3. Update AuthState (Loading, Success, Error) in StateFlow.
+ * Main Algorithm: StateFlow reactive event dispatch for asynchronous authentication.
+ */
+
 package com.example.sosjibon.auth
 
 import android.app.Application

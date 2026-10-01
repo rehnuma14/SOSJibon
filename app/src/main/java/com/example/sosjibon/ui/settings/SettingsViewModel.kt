@@ -1,9 +1,20 @@
+/*
+ * SettingsViewModel.kt
+ * Why this file is needed: Global ViewModel handling user profile preferences, emergency contacts, and Firestore user document sync.
+ * Pseudo-code:
+ * 1. Load user settings from SharedPreferences.
+ * 2. Attach Firestore snapshot listeners for live profile and emergency contact updates.
+ * 3. Execute profile updates, donation record sync, and theme mode switching.
+ * Main Algorithm: Real-time Firestore document listener and SharedPreferences persistence.
+ */
+
 package com.example.sosjibon.ui.settings
 
 import android.app.Application
 import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.sosjibon.R
 import com.example.sosjibon.data.email.EmailService
 import com.example.sosjibon.data.firebase.FirebaseAuthManager
 import com.example.sosjibon.data.firebase.FirestoreManager
@@ -60,7 +71,9 @@ data class DeveloperItem(
     val contribution: String,
     val email: String,
     val linkedin: String,
-    val initial: String
+    val initial: String,
+    val imageRes: Int? = null,
+    val imageUrl: String? = null
 )
 
 data class SettingsState(
@@ -68,40 +81,44 @@ data class SettingsState(
     val emergencyContacts: List<EmergencyContactItem> = emptyList(),
     val developers: List<DeveloperItem> = listOf(
         DeveloperItem(
-            name = "Shafiul Islam",
-            role = "Lead Developer",
-            designation = "Lead Systems & Android Engineer",
-            contribution = "Architecture, App Navigation, Emergency SOS Engine, and Compose UI Framework.",
-            email = "shafiul@sosjibon.org",
-            linkedin = "linkedin.com/in/shafiul-islam",
-            initial = "SI"
+            name = "Rehnuma Ahmed",
+            role = "Team Leader",
+            designation = "Lead Systems & Firebase Authentication",
+            contribution = "Firebase Authentication, Settings & User Profile, Emergency SOS Engine, and Jetpack Compose UI Development.",
+            email = "rehnuma.14.11@gmail.com",
+            linkedin = "https://www.linkedin.com/in/reh-nu-ma?utm_source=share_via&utm_content=profile&utm_medium=member_android",
+            initial = "RA",
+            imageRes = R.drawable.rehnuma
         ),
         DeveloperItem(
-            name = "Mahmudul Hasan",
-            role = "Backend Lead",
-            designation = "Cloud & Security Infrastructure Lead",
-            contribution = "Firebase Authentication, Cloud Firestore Realtime Sync, and Encrypted Storage.",
-            email = "mahmudul@sosjibon.org",
-            linkedin = "linkedin.com/in/mahmudul-hasan",
-            initial = "MH"
+            name = "Jobaida Khanam",
+            role = "Cloud & Security Lead",
+            designation = "Cloud Data & Secure Storage",
+            contribution = "Cloud Firestore Real-time Synchronization, Firebase Authentication, and Encrypted Room Database Storage for Community Stories.",
+            email = "jobaidapuc@gmail.com",
+            linkedin = "https://www.linkedin.com/in/jobaida-khanam-juli-447057415?utm_source=share_via&utm_content=profile&utm_medium=member_android",
+            initial = "JK",
+            imageRes = R.drawable.jobaida
         ),
         DeveloperItem(
-            name = "Nusrat Jahan",
-            role = "UI/UX Specialist",
-            designation = "Mobile Product & Experience Designer",
-            contribution = "Healthcare Vault UI, Vitals Trend Canvas Visualization, and Design System.",
-            email = "nusrat@sosjibon.org",
-            linkedin = "linkedin.com/in/nusrat-jahan",
-            initial = "NJ"
+            name = "Aditya Babu Tanmoy",
+            role = "AI & GPS Integrator",
+            designation = "AI Integration & Location Services",
+            contribution = "GPS Location Services, AI Assistant Integration, API Integration, and Trained AI Model Integration.",
+            email = "adityababutanmoy1234@gmail.com",
+            linkedin = "https://www.linkedin.com/in/aditya-babu-tanmoy-2025abt?utm_source=share_via&utm_content=profile&utm_medium=member_android",
+            initial = "ABT",
+            imageRes = R.drawable.aditya
         ),
         DeveloperItem(
-            name = "Tanvir Ahmed",
-            role = "QA & Data Lead",
-            designation = "Quality Assurance & Health Systems Lead",
-            contribution = "Emergency GPS Location Services, First Aid E-Library, and End-to-End Testing.",
-            email = "tanvir@sosjibon.org",
-            linkedin = "linkedin.com/in/tanvir-ahmed",
-            initial = "TA"
+            name = "Arman Samir",
+            role = "Health Content & Authentication Lead",
+            designation = "E-Library & Authentication",
+            contribution = "First Aid E-Library Content Management, User Authentication, and Google Sign-In Integration.",
+            email = "sameerarmaan1200@gmail.com",
+            linkedin = "https://www.linkedin.com/in/arman-samir-22a2213b6?utm_source=share_via&utm_content=profile&utm_medium=member_android",
+            initial = "AS",
+            imageRes = R.drawable.arman
         )
     ),
     val isLoggedIn: Boolean = false,

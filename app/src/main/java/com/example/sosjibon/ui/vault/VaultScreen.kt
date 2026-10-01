@@ -1,3 +1,13 @@
+/*
+ * VaultScreen.kt
+ * Why this file is needed: Offline encrypted medical vault UI displaying health records and blood donation history.
+ * Pseudo-code:
+ * 1. Read health readings, medications, and donation logs from VaultViewModel.
+ * 2. Render vitals trend canvas, emergency card, and donation history list.
+ * 3. Allow adding, editing, and deleting donation records.
+ * Main Algorithm: Local Room database UI binding and 90-day donation countdown display.
+ */
+
 package com.example.sosjibon.ui.vault
 
 import android.content.Context

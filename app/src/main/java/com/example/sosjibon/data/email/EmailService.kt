@@ -18,7 +18,7 @@ class EmailService {
         .build()
 
     // 1. Brevo Key (starts with "xkeysib-") OR Resend Key (starts with "re_")
-    var apiKey: String = ""
+    var apiKey: String = "YOUR_RESEND_API_KEY_HERE"
 
     // Backwards compatibility property
     var resendApiKey: String

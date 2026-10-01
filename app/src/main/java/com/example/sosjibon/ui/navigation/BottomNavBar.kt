@@ -83,7 +83,14 @@ fun SosJibonBottomNavBar(
                 NavigationBarItem(
                     selected = selected,
                     onClick = {
-                        if (!selected) {
+                        if (screen.route == Screen.Home.route) {
+                            navController.navigate(Screen.Home.route) {
+                                popUpTo(Screen.Home.route) {
+                                    inclusive = false
+                                }
+                                launchSingleTop = true
+                            }
+                        } else if (!selected) {
                             navController.navigate(screen.route) {
                                 popUpTo(navController.graph.findStartDestination().id) {
                                     saveState = true

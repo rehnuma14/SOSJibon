@@ -1,3 +1,13 @@
+/*
+ * VaultViewModel.kt
+ * Why this file is needed: ViewModel managing local Room database operations for health records and blood donations.
+ * Pseudo-code:
+ * 1. Connect to MedicalDao in VaultDatabase.
+ * 2. Expose StateFlow streams for health readings, documents, and donation logs.
+ * 3. Calculate next eligible donation date based on latest donation record.
+ * Main Algorithm: Room reactive Flow streams and 90-day donation date calculation algorithm.
+ */
+
 package com.example.sosjibon.ui.vault
 
 import android.app.Application

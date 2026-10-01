@@ -1,3 +1,13 @@
+/*
+ * EmergencySosScreen.kt
+ * Why this file is needed: Core 1-tap Emergency SOS trigger UI and live emergency broadcaster.
+ * Pseudo-code:
+ * 1. Capture current user GPS coordinates.
+ * 2. Broadcast active emergency document to Firestore `active_sos_alerts`.
+ * 3. Notify emergency contacts via SMS/Dialer and show 1-tap "Mark Safe" resolution button.
+ * Main Algorithm: Real-time location broadcasting and emergency alert lifecycle management.
+ */
+
 package com.example.sosjibon.ui.emergency
 
 import android.Manifest

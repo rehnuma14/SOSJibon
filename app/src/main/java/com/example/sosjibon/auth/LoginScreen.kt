@@ -1,3 +1,13 @@
+/*
+ * LoginScreen.kt
+ * Why this file is needed: UI for user sign-in using email/password or Google authentication.
+ * Pseudo-code:
+ * 1. Render input fields for email and password.
+ * 2. Validate input strings.
+ * 3. Invoke AuthViewModel.login(email, pass) on click.
+ * Main Algorithm: Input validation and Jetpack Compose form state binding.
+ */
+
 package com.example.sosjibon.auth
 
 import android.widget.Toast

@@ -1,3 +1,13 @@
+/*
+ * GpsMapScreen.kt
+ * Why this file is needed: Full-screen interactive map for finding nearest hospitals, clinics, and pharmacies.
+ * Pseudo-code:
+ * 1. Initialize MapLibre GL map with Geoapify vector tiles.
+ * 2. Fetch user's current GPS location via FusedLocationProviderClient.
+ * 3. Query nearby medical facilities and place markers on map using Haversine distance.
+ * Main Algorithm: Haversine distance formula for spherical spatial proximity sorting.
+ */
+
 package com.example.sosjibon.ui.home
 
 import android.Manifest
@@ -281,18 +291,16 @@ fun GpsMapScreen(onBack: () -> Unit) {
         val latitude = savedNearestLatitude ?: return@LaunchedEffect
         val longitude = savedNearestLongitude ?: return@LaunchedEffect
 
-        if (nearestMedicalMarker == null) {
-            nearestMedicalMarker?.let { map.removeMarker(it) }
-            val destination = LatLng(latitude, longitude)
-            val marker = map.addMarker(
-                MarkerOptions()
-                    .position(destination)
-                    .title(savedNearestName ?: "Medical Facility")
-                    .snippet(savedNearestAddress ?: "Address unavailable")
-                    .icon(createMedicalIcon(context, savedNearestType ?: "clinic"))
-            )
-            nearestMedicalMarker = marker
-        }
+        nearestMedicalMarker?.let { map.removeMarker(it) }
+        val destination = LatLng(latitude, longitude)
+        val marker = map.addMarker(
+            MarkerOptions()
+                .position(destination)
+                .title(savedNearestName ?: "Medical Facility")
+                .snippet(savedNearestAddress ?: "Address unavailable")
+                .icon(createMedicalIcon(context, savedNearestType ?: "clinic"))
+        )
+        nearestMedicalMarker = marker
 
         val userLat = savedLatitude ?: return@LaunchedEffect
         val userLon = savedLongitude ?: return@LaunchedEffect

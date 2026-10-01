@@ -1,3 +1,13 @@
+/*
+ * RegisterScreen.kt
+ * Why this file is needed: UI for creating a new user account with personal details.
+ * Pseudo-code:
+ * 1. Render input fields for Full Name, Email, Phone, and Password.
+ * 2. Validate string formats and password strength.
+ * 3. Invoke AuthViewModel.register(...) on click.
+ * Main Algorithm: Pattern-matching regex validation and account registration workflow.
+ */
+
 package com.example.sosjibon.auth
 
 import android.util.Patterns

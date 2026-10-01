@@ -246,48 +246,72 @@ fun AppNavHost(navController: NavHostController, innerPadding: PaddingValues) {
         }
 
         composable(Screen.Home.route) {
-            HomeScreen(
-                onNavigateToMap = { navController.navigate(ROUTE_GPS_MAP) },
-                onNavigateToStories = { navController.navigate(ROUTE_COMMUNITY_STORIES) },
-                onNavigateToAuth = { navController.navigate(ROUTE_LANDING) },
-                onNavigateToUsers = { navController.navigate(Screen.AdminUsers.route) },
-                onNavigateToSosHistory = { navController.navigate(Screen.AdminSosHistory.route) },
-                onNavigateToSettings = { navController.navigate(Screen.AdminSettings.route) }
-            )
-        }
-
-        eLibraryGraph(navController)
-        composable(Screen.Vault.route) {
-            VaultScreen(
-                onNavigateToAuth = { navController.navigate(ROUTE_LANDING) }
-            )
-        }
-        composable(
-            Screen.Settings.route
-        ) {
-            SettingsScreen(
-                onLogoutClick = {
+            if (currentUser == null && savedEmail.isBlank()) {
+                LaunchedEffect(Unit) {
                     navController.navigate(ROUTE_LANDING) {
                         popUpTo(0) { inclusive = true }
                     }
-                },
-                onNavigateToAuth = { navController.navigate(ROUTE_LANDING) },
-                onNavigateToEditProfile = {
-                    navController.navigate(ROUTE_EDIT_PROFILE)
-                },
-                onNavigateToSecurity = {
-                    navController.navigate(ROUTE_SECURITY)
-                },
-                onNavigateToPrivacyTerms = {
-                    navController.navigate(ROUTE_PRIVACY_TERMS)
-                },
-                onNavigateToDevelopers = {
-                    navController.navigate(ROUTE_DEVELOPERS)
-                },
-                onNavigateToEmergencyContacts = {
-                    navController.navigate(ROUTE_EMERGENCY_CONTACTS)
                 }
-            )
+            } else {
+                HomeScreen(
+                    onNavigateToMap = { navController.navigate(ROUTE_GPS_MAP) },
+                    onNavigateToStories = { navController.navigate(ROUTE_COMMUNITY_STORIES) },
+                    onNavigateToAuth = { navController.navigate(ROUTE_LANDING) },
+                    onNavigateToUsers = { navController.navigate(Screen.AdminUsers.route) },
+                    onNavigateToSosHistory = { navController.navigate(Screen.AdminSosHistory.route) },
+                    onNavigateToSettings = { navController.navigate(Screen.AdminSettings.route) }
+                )
+            }
+        }
+
+        eLibraryGraph(navController)
+
+        composable(Screen.Vault.route) {
+            if (currentUser == null && savedEmail.isBlank()) {
+                LaunchedEffect(Unit) {
+                    navController.navigate(ROUTE_LANDING) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                }
+            } else {
+                VaultScreen(
+                    onNavigateToAuth = { navController.navigate(ROUTE_LANDING) }
+                )
+            }
+        }
+
+        composable(Screen.Settings.route) {
+            if (currentUser == null && savedEmail.isBlank()) {
+                LaunchedEffect(Unit) {
+                    navController.navigate(ROUTE_LANDING) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                }
+            } else {
+                SettingsScreen(
+                    onLogoutClick = {
+                        navController.navigate(ROUTE_LANDING) {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    },
+                    onNavigateToAuth = { navController.navigate(ROUTE_LANDING) },
+                    onNavigateToEditProfile = {
+                        navController.navigate(ROUTE_EDIT_PROFILE)
+                    },
+                    onNavigateToSecurity = {
+                        navController.navigate(ROUTE_SECURITY)
+                    },
+                    onNavigateToPrivacyTerms = {
+                        navController.navigate(ROUTE_PRIVACY_TERMS)
+                    },
+                    onNavigateToDevelopers = {
+                        navController.navigate(ROUTE_DEVELOPERS)
+                    },
+                    onNavigateToEmergencyContacts = {
+                        navController.navigate(ROUTE_EMERGENCY_CONTACTS)
+                    }
+                )
+            }
         }
 
         composable(ROUTE_EDIT_PROFILE) {
@@ -373,23 +397,7 @@ fun AppNavHost(navController: NavHostController, innerPadding: PaddingValues) {
 private fun startGuestSession(navController: NavHostController) {
     try {
         FirebaseAuth.getInstance().signOut()
-        val app = FirebaseApp.getInstance().applicationContext as? Application
-        val prefs = app?.getSharedPreferences("sosjibon_profile_settings", Context.MODE_PRIVATE)
-        prefs?.edit()?.apply {
-            putString("user_name", "Guest Member")
-            putString("user_email", "")
-            putString("user_phone", "")
-            putString("user_blood_group", "")
-            putString("user_dob", "")
-            putString("user_country", "")
-            putString("user_city", "")
-            putString("user_desc", "Guest Session")
-            putBoolean("user_email_verified", false)
-            apply()
-        }
     } catch (_: Exception) {}
 
-    navController.navigate(Screen.Home.route) {
-        popUpTo(0) { inclusive = true }
-    }
+    navController.navigate(ROUTE_EMERGENCY_SOS)
 }

@@ -1,386 +1,351 @@
+/*
+ * GeminiService.kt
+ * What this file does: Sends prompts and PDF files to Google Gemini API via direct REST or Firebase AI SDK.
+ *
+ * Pseudo-code:
+ * 1. Receive text prompt or PDF byte array.
+ * 2. Try direct REST request to Gemini Flash endpoints (gemini-2.5-flash, gemini-2.0-flash, gemini-flash-latest).
+ * 3. If direct REST fails, fallback to Firebase AI SDK model loop.
+ * 4. Parse candidates text response and return cleaned output string.
+ */
+
 package com.example.sosjibon.ai.gemini
 
+import android.util.Base64
 import android.util.Log
 import com.google.firebase.Firebase
 import com.google.firebase.ai.ai
 import com.google.firebase.ai.type.GenerativeBackend
 import com.google.firebase.ai.type.content
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
+import org.json.JSONObject
+import java.util.concurrent.TimeUnit
 
 class GeminiService {
 
     companion object {
         private const val TAG = "GeminiService"
-    }
+        private const val DEFAULT_API_KEY = "YOUR_GEMINI_API_KEY_HERE"
+        
+        private var customTokenId: String? = null
 
-    private val model =
-        Firebase.ai(
-            backend = GenerativeBackend.googleAI()
-        ).generativeModel(
-            "gemini-3.8-flash"
+        fun setTokenId(token: String) {
+            customTokenId = token.trim().ifBlank { null }
+        }
+
+        fun getTokenId(): String {
+            return customTokenId ?: DEFAULT_API_KEY
+        }
+
+        private val SUPPORTED_MODELS = listOf(
+            "gemini-2.5-flash",
+            "gemini-2.0-flash",
+            "gemini-flash-latest",
+            "gemini-3.5-flash-lite"
         )
+    }
 
     suspend fun generateResponse(
         prompt: String
-    ): Result<String> {
+    ): Result<String> = withContext(Dispatchers.IO) {
 
         if (prompt.isBlank()) {
-            return Result.failure(
-                IllegalArgumentException(
-                    "Question cannot be empty."
-                )
+            return@withContext Result.failure(
+                IllegalArgumentException("Question cannot be empty.")
             )
         }
 
-        return try {
+        val finalPrompt = buildMedicalPrompt(prompt)
 
-            Log.d(TAG, "Sending request to Gemini...")
-
-            val finalPrompt = buildMedicalPrompt(prompt)
-
-            val response =
-                model.generateContent(finalPrompt)
-
-            val text =
-                response.text
-
-            if (text.isNullOrBlank()) {
-
-                Log.e(
-                    TAG,
-                    "Gemini returned an empty response."
-                )
-
-                Result.failure(
-                    IllegalStateException(
-                        "Gemini returned an empty response."
-                    )
-                )
-
-            } else {
-
-                Log.d(
-                    TAG,
-                    "Gemini response received successfully."
-                )
-
-                Result.success(
-                    cleanGeminiText(text)
-                )
-            }
-
-        } catch (e: Exception) {
-
-            Log.e(
-                TAG,
-                "Gemini request failed",
-                e
-            )
-
-            val message =
-                e.message.orEmpty()
-
-            when {
-
-                message.contains(
-                    "QuotaExceededException",
-                    ignoreCase = true
-                ) ||
-                        message.contains(
-                            "quota exceeded",
-                            ignoreCase = true
-                        ) ||
-                        message.contains(
-                            "free_tier_requests",
-                            ignoreCase = true
-                        ) -> {
-
-                    Result.failure(
-                        GeminiQuotaException(
-                            "Gemini's current request limit has been reached. Please wait and try again later."
-                        )
-                    )
+        for (modelName in SUPPORTED_MODELS) {
+            try {
+                val restText = executeDirectRestRequest(finalPrompt, modelName, getTokenId())
+                if (!restText.isNullOrBlank()) {
+                    Log.d(TAG, "Gemini direct REST response received successfully with $modelName!")
+                    return@withContext Result.success(cleanGeminiText(restText))
                 }
-
-                message.contains(
-                    "high demand",
-                    ignoreCase = true
-                ) ||
-                        message.contains(
-                            "temporarily",
-                            ignoreCase = true
-                        ) -> {
-
-                    Result.failure(
-                        GeminiServerBusyException(
-                            "Gemini is currently experiencing high demand. Please try again later."
-                        )
-                    )
-                }
-
-                message.contains(
-                    "network",
-                    ignoreCase = true
-                ) ||
-                        message.contains(
-                            "timeout",
-                            ignoreCase = true
-                        ) ||
-                        message.contains(
-                            "Unable to resolve host",
-                            ignoreCase = true
-                        ) -> {
-
-                    Result.failure(
-                        GeminiNetworkException(
-                            "Unable to connect to Gemini. Please check your internet connection."
-                        )
-                    )
-                }
-
-                else -> {
-
-                    Result.failure(
-                        GeminiException(
-                            message.ifBlank {
-                                "Unable to generate a Gemini response."
-                            }
-                        )
-                    )
-                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Direct REST call failed for $modelName: ${e.message}")
             }
         }
+
+        var lastException: Exception? = null
+        for (modelName in SUPPORTED_MODELS) {
+            try {
+                Log.d(TAG, "Attempting Gemini request via Firebase AI with model: $modelName")
+                val model = Firebase.ai(
+                    backend = GenerativeBackend.googleAI()
+                ).generativeModel(modelName)
+
+                val response = model.generateContent(finalPrompt)
+                val text = response.text
+
+                if (!text.isNullOrBlank()) {
+                    Log.d(TAG, "Gemini response received successfully with $modelName")
+                    return@withContext Result.success(cleanGeminiText(text))
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Model $modelName failed: ${e.message}")
+                lastException = e
+            }
+        }
+
+        val e = lastException ?: IllegalStateException("Unable to generate a Gemini response.")
+        Log.e(TAG, "All Gemini attempts failed", e)
+        return@withContext parseException(e)
     }
-
 
     suspend fun generatePdfResponse(
         pdfBytes: ByteArray,
         question: String
-    ): Result<String> {
+    ): Result<String> = withContext(Dispatchers.IO) {
 
         if (pdfBytes.isEmpty()) {
-
-            return Result.failure(
-                IllegalArgumentException(
-                    "The selected PDF is empty."
-                )
+            return@withContext Result.failure(
+                IllegalArgumentException("The selected PDF is empty.")
             )
         }
 
-        return try {
+        val pdfPrompt = buildPdfPrompt(question)
 
-            Log.d(
-                TAG,
-                "Sending PDF to Gemini..."
-            )
+        for (modelName in SUPPORTED_MODELS) {
+            try {
+                val restText = executeDirectPdfRestRequest(pdfBytes, pdfPrompt, modelName, getTokenId())
+                if (!restText.isNullOrBlank()) {
+                    Log.d(TAG, "Gemini direct PDF REST response received successfully with $modelName!")
+                    return@withContext Result.success(cleanGeminiText(restText))
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Direct PDF REST call failed for $modelName: ${e.message}")
+            }
+        }
 
-            val pdfPrompt =
-                buildPdfPrompt(question)
+        var lastException: Exception? = null
+        for (modelName in SUPPORTED_MODELS) {
+            try {
+                Log.d(TAG, "Sending PDF to Gemini via Firebase AI with model $modelName...")
+                val model = Firebase.ai(
+                    backend = GenerativeBackend.googleAI()
+                ).generativeModel(modelName)
 
-            val content =
-                content {
+                val content = content {
                     inlineData(
                         bytes = pdfBytes,
                         mimeType = "application/pdf"
                     )
-
                     text(pdfPrompt)
                 }
 
-            val response =
-                model.generateContent(content)
+                val response = model.generateContent(content)
+                val text = response.text
 
-            val text =
-                response.text
-
-            if (text.isNullOrBlank()) {
-
-                Result.failure(
-                    IllegalStateException(
-                        "Gemini returned an empty response for the PDF."
-                    )
-                )
-
-            } else {
-
-                Log.d(
-                    TAG,
-                    "PDF response received successfully."
-                )
-
-                Result.success(
-                    cleanGeminiText(text)
-                )
+                if (!text.isNullOrBlank()) {
+                    Log.d(TAG, "PDF response received successfully with $modelName")
+                    return@withContext Result.success(cleanGeminiText(text))
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Model $modelName failed for PDF: ${e.message}")
+                lastException = e
             }
+        }
 
-        } catch (e: Exception) {
+        val e = lastException ?: IllegalStateException("Unable to analyze the PDF.")
+        Log.e(TAG, "All Gemini PDF attempts failed", e)
+        return@withContext parseException(e)
+    }
 
-            Log.e(
-                TAG,
-                "Gemini PDF request failed",
-                e
-            )
+    private fun executeDirectRestRequest(prompt: String, modelName: String, apiKey: String): String? {
+        val client = OkHttpClient.Builder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(25, TimeUnit.SECONDS)
+            .build()
 
-            val message =
-                e.message.orEmpty()
-
-            when {
-
-                message.contains(
-                    "QuotaExceededException",
-                    ignoreCase = true
-                ) ||
-                        message.contains(
-                            "quota exceeded",
-                            ignoreCase = true
-                        ) -> {
-
-                    Result.failure(
-                        GeminiQuotaException(
-                            "Gemini's current request limit has been reached. Please wait and try again later."
-                        )
-                    )
+        val jsonBody = JSONObject().apply {
+            val contentsArray = JSONArray().apply {
+                val contentObj = JSONObject().apply {
+                    val partsArray = JSONArray().apply {
+                        val partObj = JSONObject().apply {
+                            put("text", prompt)
+                        }
+                        put(partObj)
+                    }
+                    put("parts", partsArray)
                 }
+                put(contentObj)
+            }
+            put("contents", contentsArray)
+        }
 
-                message.contains(
-                    "high demand",
-                    ignoreCase = true
-                ) ||
-                        message.contains(
-                            "temporarily",
-                            ignoreCase = true
-                        ) -> {
+        val mediaType = "application/json; charset=utf-8".toMediaType()
+        val body = jsonBody.toString().toRequestBody(mediaType)
 
-                    Result.failure(
-                        GeminiServerBusyException(
-                            "Gemini is currently experiencing high demand. Please try again later."
-                        )
-                    )
+        val url = "https://generativelanguage.googleapis.com/v1beta/models/$modelName:generateContent"
+
+        val request = Request.Builder()
+            .url(url)
+            .addHeader("Content-Type", "application/json")
+            .addHeader("X-goog-api-key", apiKey)
+            .post(body)
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            val responseString = response.body?.string() ?: ""
+            if (response.isSuccessful && responseString.isNotBlank()) {
+                val json = JSONObject(responseString)
+                val candidates = json.optJSONArray("candidates")
+                if (candidates != null && candidates.length() > 0) {
+                    val firstCandidate = candidates.getJSONObject(0)
+                    val content = firstCandidate.optJSONObject("content")
+                    val parts = content?.optJSONArray("parts")
+                    if (parts != null && parts.length() > 0) {
+                        val text = parts.getJSONObject(0).optString("text", "")
+                        if (text.isNotBlank()) return text
+                    }
                 }
+            } else {
+                Log.w(TAG, "Direct REST failed model=$modelName code=${response.code}, body=$responseString")
+            }
+        }
+        return null
+    }
 
-                message.contains(
-                    "network",
-                    ignoreCase = true
-                ) ||
-                        message.contains(
-                            "timeout",
-                            ignoreCase = true
-                        ) -> {
+    private fun executeDirectPdfRestRequest(pdfBytes: ByteArray, prompt: String, modelName: String, apiKey: String): String? {
+        val client = OkHttpClient.Builder()
+            .connectTimeout(20, TimeUnit.SECONDS)
+            .readTimeout(35, TimeUnit.SECONDS)
+            .build()
 
-                    Result.failure(
-                        GeminiNetworkException(
-                            "Unable to connect to Gemini. Please check your internet connection."
-                        )
-                    )
-                }
+        val base64Pdf = Base64.encodeToString(pdfBytes, Base64.NO_WRAP)
 
-                else -> {
-
-                    Result.failure(
-                        GeminiException(
-                            message.ifBlank {
-                                "Unable to analyze the PDF."
+        val jsonBody = JSONObject().apply {
+            val contentsArray = JSONArray().apply {
+                val contentObj = JSONObject().apply {
+                    val partsArray = JSONArray().apply {
+                        val pdfPartObj = JSONObject().apply {
+                            val inlineDataObj = JSONObject().apply {
+                                put("mime_type", "application/pdf")
+                                put("data", base64Pdf)
                             }
-                        )
-                    )
+                            put("inline_data", inlineDataObj)
+                        }
+                        put(pdfPartObj)
+
+                        val textPartObj = JSONObject().apply {
+                            put("text", prompt)
+                        }
+                        put(textPartObj)
+                    }
+                    put("parts", partsArray)
                 }
+                put(contentObj)
+            }
+            put("contents", contentsArray)
+        }
+
+        val mediaType = "application/json; charset=utf-8".toMediaType()
+        val body = jsonBody.toString().toRequestBody(mediaType)
+
+        val url = "https://generativelanguage.googleapis.com/v1beta/models/$modelName:generateContent"
+
+        val request = Request.Builder()
+            .url(url)
+            .addHeader("Content-Type", "application/json")
+            .addHeader("X-goog-api-key", apiKey)
+            .post(body)
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            val responseString = response.body?.string() ?: ""
+            if (response.isSuccessful && responseString.isNotBlank()) {
+                val json = JSONObject(responseString)
+                val candidates = json.optJSONArray("candidates")
+                if (candidates != null && candidates.length() > 0) {
+                    val firstCandidate = candidates.getJSONObject(0)
+                    val content = firstCandidate.optJSONObject("content")
+                    val parts = content?.optJSONArray("parts")
+                    if (parts != null && parts.length() > 0) {
+                        val text = parts.getJSONObject(0).optString("text", "")
+                        if (text.isNotBlank()) return text
+                    }
+                }
+            } else {
+                Log.w(TAG, "Direct PDF REST failed model=$modelName code=${response.code}, body=$responseString")
+            }
+        }
+        return null
+    }
+
+    private fun parseException(e: Exception): Result<String> {
+        val message = e.message.orEmpty()
+        return when {
+            message.contains("QuotaExceededException", ignoreCase = true) ||
+                    message.contains("quota exceeded", ignoreCase = true) ||
+                    message.contains("429", ignoreCase = true) -> {
+                Result.failure(GeminiQuotaException("Gemini's current request limit has been reached. Please wait and try again later."))
+            }
+            message.contains("high demand", ignoreCase = true) ||
+                    message.contains("503", ignoreCase = true) -> {
+                Result.failure(GeminiServerBusyException("Gemini is currently experiencing high demand. Please try again later."))
+            }
+            message.contains("network", ignoreCase = true) ||
+                    message.contains("timeout", ignoreCase = true) ||
+                    message.contains("Unable to resolve host", ignoreCase = true) -> {
+                Result.failure(GeminiNetworkException("Unable to connect to Gemini. Please check your internet connection."))
+            }
+            else -> {
+                Result.failure(GeminiException(message.ifBlank { "Unable to generate a Gemini response." }))
             }
         }
     }
 
-
-    private fun buildMedicalPrompt(
-        question: String
-    ): String {
-
+    private fun buildMedicalPrompt(question: String): String {
         return """
-            You are the medical information assistant inside an Android application
-            called SOS Jibon.
+            You are the medical information assistant inside an Android application called SOS Jibon.
 
             Answer the user's question clearly, briefly, and safely.
 
             IMPORTANT OUTPUT RULES:
-
-            1. Do NOT use Markdown.
-            2. Do NOT use ###.
-            3. Do NOT use **.
-            4. Do NOT use *.
-            5. Do NOT use markdown tables.
-            6. Do NOT write long paragraphs.
-            7. Do NOT repeat the user's question.
-            8. Keep the answer concise and useful.
-            9. Use short sentences.
-            10. Use numbered points when steps are needed.
-            11. Mention only information that is relevant to the question.
-            12. Do not unnecessarily list many possible diseases.
-            13. Do not give a definitive diagnosis.
-            14. For serious symptoms, clearly mention when urgent medical help is needed.
-            15. Do not create unnecessary disclaimers.
-            16. Do not use emojis.
-            17. Use the exact section labels below when they are relevant.
+            1. Do NOT use Markdown formatting (no #, **, *, tables).
+            2. Keep the answer concise and useful.
+            3. Use numbered points when steps are needed.
+            4. Do not give a definitive diagnosis.
+            5. For serious symptoms, clearly mention when urgent medical help is needed.
 
             RESPONSE FORMAT:
-
             SUMMARY
             One or two short sentences.
-
-            POSSIBLE CONCERN
-            Short explanation only when appropriate.
 
             WHAT TO DO
             2 to 5 short actionable points.
 
             WHEN TO GET HELP
-            Only include this section if there are warning signs.
-            Keep it short.
-
-            IMPORTANT
-            Only include this section when there is something particularly important
-            that the user should not miss.
-
-            If a section is not useful, completely omit that section.
+            Only include if warning signs are present.
 
             USER QUESTION:
             $question
         """.trimIndent()
     }
 
-
-    private fun buildPdfPrompt(
-        question: String
-    ): String {
-
-        val userQuestion =
-            if (question.isBlank()) {
-                "Summarize and explain the important information in this PDF."
-            } else {
-                question
-            }
+    private fun buildPdfPrompt(question: String): String {
+        val userQuestion = question.ifBlank { "Summarize and explain the important information in this PDF." }
 
         return """
             You are the medical information assistant inside SOS Jibon.
-
-            Analyze the attached PDF and answer the user's question using the PDF
-            as the primary source.
+            Analyze the attached PDF and answer the user's question using the PDF as the primary source.
 
             IMPORTANT OUTPUT RULES:
-
-            1. Do NOT use Markdown.
-            2. Do NOT use ###.
-            3. Do NOT use **.
-            4. Do NOT use *.
-            5. Do NOT use markdown tables.
-            6. Do NOT write long paragraphs.
-            7. Do NOT repeat the user's question.
-            8. Keep the answer concise.
-            9. Use short sentences.
-            10. Use numbered points for steps.
-            11. Focus only on information relevant to the user's question.
-            12. If the answer is not available in the PDF, clearly say that.
-            13. Do not invent information that is not supported by the PDF.
-            14. Do not give a definitive medical diagnosis.
+            1. Do NOT use Markdown formatting.
+            2. Keep the answer concise and clear.
+            3. Use numbered points for steps.
+            4. Focus only on information relevant to the user's question.
 
             RESPONSE FORMAT:
-
             SUMMARY
             One or two short sentences.
 
@@ -388,23 +353,14 @@ class GeminiService {
             2 to 5 important points from the PDF.
 
             WHAT TO DO
-            Only if the PDF/question requires an action.
-
-            IMPORTANT
-            Only if there is an important warning or critical information.
-
-            If a section is not useful, omit it.
+            Only if action is required.
 
             USER QUESTION:
             $userQuestion
         """.trimIndent()
     }
 
-
-    private fun cleanGeminiText(
-        text: String
-    ): String {
-
+    private fun cleanGeminiText(text: String): String {
         return text
             .replace("###", "")
             .replace("**", "")
@@ -415,22 +371,7 @@ class GeminiService {
     }
 }
 
-
-class GeminiQuotaException(
-    message: String
-) : Exception(message)
-
-
-class GeminiServerBusyException(
-    message: String
-) : Exception(message)
-
-
-class GeminiNetworkException(
-    message: String
-) : Exception(message)
-
-
-class GeminiException(
-    message: String
-) : Exception(message)
+class GeminiQuotaException(message: String) : Exception(message)
+class GeminiServerBusyException(message: String) : Exception(message)
+class GeminiNetworkException(message: String) : Exception(message)
+class GeminiException(message: String) : Exception(message)

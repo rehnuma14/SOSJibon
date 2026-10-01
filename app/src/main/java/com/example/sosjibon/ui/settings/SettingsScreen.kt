@@ -1,7 +1,18 @@
+/*
+ * SettingsScreen.kt
+ * Why this file is needed: Application settings menu for managing profile, contacts, theme, and language.
+ * Pseudo-code:
+ * 1. Read profile preferences and active theme state.
+ * 2. Render options for Edit Profile, Emergency Contacts, Theme Mode, Language, and Developer Credits.
+ * 3. Provide Sign-Out and Account Deletion actions.
+ * Main Algorithm: SharedPreferences configuration binding and theme state toggling.
+ */
+
 package com.example.sosjibon.ui.settings
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -137,7 +148,11 @@ fun SettingsScreen(
                 val file = File(state.profile.imageUri)
                 if (file.exists()) {
                     BitmapFactory.decodeFile(file.absolutePath)
-                } else null
+                } else {
+                    context.contentResolver.openInputStream(Uri.parse(state.profile.imageUri))?.use { input ->
+                        BitmapFactory.decodeStream(input)
+                    }
+                }
             } catch (_: Exception) {
                 null
             }
