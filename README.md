@@ -15,7 +15,7 @@
 
 ---
 
-## 📖 Overview
+## 📖 Overview.
 
 SOSJibon combines live SOS broadcasting, an admin oversight system, an on-device + cloud AI assistant, and a bilingual first-aid knowledge base into a single emergency response platform. It targets real-world emergency response with content covering 26 medical conditions in both Bengali and English.
 
