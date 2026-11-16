@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🚑 SOSJibon
+# 🚑 SOSJibon.
 
 **A medical emergency first-aid platform for Android**
 
